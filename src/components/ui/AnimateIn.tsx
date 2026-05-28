@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode, CSSProperties } from "react";
+import type { ReactNode, CSSProperties, ElementType } from "react";
 
 type Animation = "fade-in" | "fade-up" | "fade-down" | "slide-right" | "slide-left" | "scale-in";
 
@@ -10,7 +10,7 @@ interface AnimateInProps {
   delay?: number;       // ms
   duration?: number;    // ms
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
+  as?: ElementType;
 }
 
 const ANIMATION_CLASS: Record<Animation, string> = {
