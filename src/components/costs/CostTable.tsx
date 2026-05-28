@@ -1,0 +1,645 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import type { BudgetItem } from "../../lib/supabase/types";
+import { CATEGORIES, CATEGORY_MAP } from "../../lib/constants";
+import { formatUSD } from "../../lib/calculations";
+import {
+  CATEGORY_ICONS,
+  COST_TYPE_ICONS,
+  Trash2,
+  Plus,
+  X,
+  Pencil,
+  Check,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  User,
+  Users,
+  BedDouble,
+} from "../../lib/icons";
+
+interface CostTableProps {
+  items: BudgetItem[];
+  onUpdate: (itemId: string, updates: Partial<BudgetItem>) => Promise<void>;
+  onDelete: (itemId: string) => Promise<void>;
+  onAdd: (item: Omit<BudgetItem, "id" | "created_at" | "updated_at" | "updated_by">) => Promise<void>;
+  tripId: string;
+}
+
+const TIER_OPTIONS = [
+  { value: "all", label: "All Tiers" },
+  { value: "budget", label: "Budget" },
+  { value: "balanced", label: "Balanced" },
+  { value: "premium", label: "Premium" },
+  { value: "budget,balanced", label: "Budget + Balanced" },
+  { value: "balanced,premium", label: "Balanced + Premium" },
+];
+
+const COST_TYPE_OPTIONS = [
+  { value: "per_person", label: "Per Person" },
+  { value: "total_group", label: "Group Total" },
+  { value: "per_room", label: "Per Room" },
+];
+
+type SortField = "category" | "name" | "description" | "cost_usd" | "cost_type" | "tier" | "source_label";
+
+const PAGE_SIZE = 15;
+
+const EMPTY_ITEM = {
+  category: "flights",
+  name: "",
+  description: "",
+  cost_usd: 0,
+  cost_type: "per_person" as BudgetItem["cost_type"],
+  tier: "all",
+  source_label: "",
+  source_url: "",
+  is_optional: false,
+  is_included: true,
+};
+
+/* ─── Modal ─── */
+function ItemModal({
+  mode,
+  initial,
+  onSave,
+  onClose,
+}: {
+  mode: "add" | "edit";
+  initial: typeof EMPTY_ITEM;
+  onSave: (data: typeof EMPTY_ITEM) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState(initial);
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={backdropRef}
+      onClick={(e) => e.target === backdropRef.current && onClose()}
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-backdrop"
+    >
+      <div className="bg-[#181818] border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl animate-scale-in">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+            {mode === "add" ? (
+              <Plus className="w-5 h-5 text-sky-400" />
+            ) : (
+              <Pencil className="w-5 h-5 text-sky-400" />
+            )}
+            {mode === "add" ? "Add Budget Item" : "Edit Budget Item"}
+          </h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-300">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          {/* Category + Name */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Category *</label>
+              <select
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 focus:border-sky-600 focus:outline-none"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c.key} value={c.key}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Item Name *</label>
+              <input
+                placeholder="e.g. Park tickets"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:border-sky-600 focus:outline-none"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1.5">Description</label>
+            <input
+              placeholder="Brief description"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:border-sky-600 focus:outline-none"
+            />
+          </div>
+
+          {/* Cost + Type + Tier */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Cost (USD) *</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={form.cost_usd || ""}
+                onChange={(e) => setForm({ ...form, cost_usd: parseFloat(e.target.value) || 0 })}
+                className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 font-mono focus:border-sky-600 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Cost Type</label>
+              <select
+                value={form.cost_type}
+                onChange={(e) => setForm({ ...form, cost_type: e.target.value as BudgetItem["cost_type"] })}
+                className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 focus:border-sky-600 focus:outline-none"
+              >
+                {COST_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Tier</label>
+              <select
+                value={form.tier}
+                onChange={(e) => setForm({ ...form, tier: e.target.value })}
+                className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 focus:border-sky-600 focus:outline-none"
+              >
+                {TIER_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Source Label + URL */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Source Label</label>
+              <input
+                placeholder="e.g. Google Flights"
+                value={form.source_label}
+                onChange={(e) => setForm({ ...form, source_label: e.target.value })}
+                className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:border-sky-600 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Source URL</label>
+              <input
+                placeholder="https://..."
+                value={form.source_url}
+                onChange={(e) => setForm({ ...form, source_url: e.target.value })}
+                className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:border-sky-600 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Optional */}
+          <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.is_optional}
+              onChange={(e) => setForm({ ...form, is_optional: e.target.checked })}
+              className="w-4 h-4 rounded border-gray-600 bg-[#222] text-sky-500 focus:ring-sky-500"
+            />
+            Optional item
+          </label>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-800">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(form)}
+            disabled={!form.name.trim()}
+            className="px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {mode === "add" ? "Add Item" : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Delete Confirmation Modal ─── */
+function DeleteModal({
+  itemName,
+  onConfirm,
+  onClose,
+}: {
+  itemName: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  return (
+    <div
+      ref={backdropRef}
+      onClick={(e) => e.target === backdropRef.current && onClose()}
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-backdrop"
+    >
+      <div className="bg-[#181818] border border-gray-700 rounded-xl w-full max-w-sm shadow-2xl animate-scale-in">
+        <div className="px-6 py-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-red-950/60 flex items-center justify-center">
+              <Trash2 className="w-5 h-5 text-red-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-white">Delete Item</h3>
+          </div>
+          <p className="text-sm text-gray-400">
+            Are you sure you want to delete <span className="text-white font-medium">&ldquo;{itemName}&rdquo;</span>? This action cannot be undone.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-800">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200">
+            Cancel
+          </button>
+          <button
+            onClick={() => { onConfirm(); onClose(); }}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-500"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Sort Header ─── */
+function SortHeader({
+  label,
+  field,
+  currentField,
+  asc,
+  onSort,
+  className = "",
+}: {
+  label: string;
+  field: SortField;
+  currentField: SortField;
+  asc: boolean;
+  onSort: (f: SortField) => void;
+  className?: string;
+}) {
+  const active = currentField === field;
+  return (
+    <th
+      className={`px-3 py-3 font-medium text-gray-400 cursor-pointer hover:text-gray-200 whitespace-nowrap select-none ${className}`}
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active ? (
+          asc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronsUpDown className="w-3.5 h-3.5 opacity-30" />
+        )}
+      </span>
+    </th>
+  );
+}
+
+/* ─── Main CostTable ─── */
+export default function CostTable({ items, onUpdate, onDelete, onAdd, tripId }: CostTableProps) {
+  const [filter, setFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<SortField>("category");
+  const [sortAsc, setSortAsc] = useState(true);
+  const [page, setPage] = useState(0);
+
+  // Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editItem, setEditItem] = useState<BudgetItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BudgetItem | null>(null);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
+  const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
+
+  const sorted = [...filtered].sort((a, b) => {
+    const dir = sortAsc ? 1 : -1;
+    if (sortField === "cost_usd") return (a.cost_usd - b.cost_usd) * dir;
+    const aVal = String(a[sortField] ?? "");
+    const bVal = String(b[sortField] ?? "");
+    return aVal.localeCompare(bVal) * dir;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const paged = sorted.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  // Reset page when filter changes
+  useEffect(() => { setPage(0); }, [filter]);
+
+  function handleSort(field: SortField) {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(true); }
+  }
+
+  const handleAdd = useCallback(async (data: typeof EMPTY_ITEM) => {
+    await onAdd({
+      ...data,
+      trip_id: tripId,
+      cost_usd: Number(data.cost_usd),
+      sort_order: items.length,
+      is_optional: data.is_optional,
+      is_included: data.is_included,
+    });
+    setShowAddModal(false);
+  }, [onAdd, tripId, items.length]);
+
+  const handleEdit = useCallback(async (data: typeof EMPTY_ITEM) => {
+    if (!editItem) return;
+    await onUpdate(editItem.id, {
+      category: data.category,
+      name: data.name,
+      description: data.description || null,
+      cost_usd: Number(data.cost_usd),
+      cost_type: data.cost_type,
+      tier: data.tier,
+      source_label: data.source_label || null,
+      source_url: data.source_url || null,
+      is_optional: data.is_optional,
+    });
+    setEditItem(null);
+  }, [editItem, onUpdate]);
+
+  const tierLabel = (t: string) => TIER_OPTIONS.find((o) => o.value === t)?.label ?? t;
+  const costTypeLabel = (t: string) => COST_TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t;
+  const CostTypeIcon = (t: string) => COST_TYPE_ICONS[t] || User;
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-220px)] min-h-[400px]">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 flex-shrink-0 animate-fade-up">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              filter === "all"
+                ? "bg-sky-600 text-white"
+                : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
+            }`}
+          >
+            All ({items.length})
+          </button>
+          {CATEGORIES.map((cat) => {
+            const count = items.filter((i) => i.category === cat.key).length;
+            const Icon = CATEGORY_ICONS[cat.key];
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setFilter(cat.key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+                  filter === cat.key
+                    ? "bg-sky-600 text-white"
+                    : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {cat.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Add button */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-3 py-1.5 bg-sky-600 text-white text-xs font-medium rounded-lg hover:bg-sky-500 transition-colors inline-flex items-center gap-1.5 flex-shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add
+        </button>
+      </div>
+
+      {/* Table Container — scrollable body, sticky header */}
+      <div className="bg-[#141414] rounded-xl border border-gray-800 flex flex-col flex-1 min-h-0 overflow-hidden animate-fade-up" style={{ animationDelay: '80ms' }}>
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-[#1a1a1a]">
+                <SortHeader label="Category" field="category" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <SortHeader label="Item" field="name" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <SortHeader label="Description" field="description" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <SortHeader label="Cost (USD)" field="cost_usd" currentField={sortField} asc={sortAsc} onSort={handleSort} className="text-right" />
+                <SortHeader label="Type" field="cost_type" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <SortHeader label="Tier" field="tier" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <SortHeader label="Source" field="source_label" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <th className="px-3 py-3 font-medium text-gray-400 w-24 text-center whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {paged.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                    No items found. Click &ldquo;Add Item&rdquo; to create one.
+                  </td>
+                </tr>
+              ) : (
+                paged.map((item, idx) => {
+                  const CatIcon = CATEGORY_ICONS[item.category];
+                  const TypeIcon = CostTypeIcon(item.cost_type);
+                  const isExpanded = expandedRow === item.id;
+                  return (
+                    <Fragment key={item.id}>
+                    <tr className={`group animate-fade-up transition-opacity duration-150 ${item.is_included ? 'hover:bg-[#1a1a1a]/60' : 'opacity-40 hover:bg-[#1a1a1a]/30'}`} style={{ animationDelay: `${120 + idx * 30}ms` }}>
+                      <td className="px-3 py-2.5">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+                          {CatIcon && <CatIcon className="w-3.5 h-3.5 text-sky-400" />}
+                          {CATEGORY_MAP[item.category as keyof typeof CATEGORY_MAP]?.label ?? item.category}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 font-medium text-gray-100 min-w-[180px]">
+                        {item.name}
+                      </td>
+                      <td
+                        className="px-3 py-2.5 text-gray-500 text-xs max-w-[220px] cursor-pointer"
+                        title={item.description || undefined}
+                        onClick={() => setExpandedRow(isExpanded ? null : item.id)}
+                      >
+                        {item.description ? (
+                          <span className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-1"}>{item.description}</span>
+                        ) : (
+                          <span className="text-gray-700">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-sm text-gray-200">
+                        {formatUSD(item.cost_usd)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                          <TypeIcon className="w-3.5 h-3.5 text-gray-500" />
+                          {costTypeLabel(item.cost_type)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                            item.tier === "all"
+                              ? "bg-gray-800 text-gray-300"
+                              : item.tier.includes("premium")
+                              ? "bg-amber-950/60 text-amber-400"
+                              : item.tier.includes("balanced")
+                              ? "bg-sky-950/60 text-sky-300"
+                              : "bg-emerald-950/60 text-emerald-400"
+                          }`}
+                        >
+                          {tierLabel(item.tier)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs">
+                        {item.source_url ? (
+                          <a
+                            href={item.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            {item.source_label || "Link"}
+                          </a>
+                        ) : (
+                          <span className="text-gray-500">{item.source_label || "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => onUpdate(item.id, { is_included: !item.is_included })}
+                            className="group/toggle flex items-center gap-1 cursor-pointer"
+                            title={item.is_included ? "Exclude from trip budget" : "Include in trip budget"}
+                          >
+                            <div className={`relative w-7 h-4 rounded-full transition-colors duration-150 ${
+                              item.is_included ? 'bg-emerald-600' : 'bg-gray-700'
+                            }`}>
+                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-150 ${
+                                item.is_included ? 'left-3.5' : 'left-0.5'
+                              }`} />
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => setEditItem(item)}
+                            className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(item)}
+                            className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-red-400 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && item.description && (
+                      <tr className="bg-[#1a1a1a]/40">
+                        <td colSpan={8} className="px-4 py-3 text-xs text-gray-400">
+                          <span className="text-gray-500 font-medium">Description:</span>{" "}
+                          <span className="whitespace-pre-wrap">{item.description}</span>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-800 bg-[#1a1a1a] flex-shrink-0">
+            <p className="text-xs text-gray-500">
+              Showing {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, sorted.length)} of {sorted.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(Math.max(0, safePage - 1))}
+                disabled={safePage === 0}
+                className="p-1.5 rounded hover:bg-[#222] text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setPage(i)}
+                  className={`w-7 h-7 rounded text-xs font-medium transition-colors ${
+                    i === safePage
+                      ? "bg-sky-600 text-white"
+                      : "text-gray-400 hover:bg-[#222] hover:text-gray-200"
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))}
+                disabled={safePage >= totalPages - 1}
+                className="p-1.5 rounded hover:bg-[#222] text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Modals ── */}
+      {showAddModal && (
+        <ItemModal mode="add" initial={EMPTY_ITEM} onSave={handleAdd} onClose={() => setShowAddModal(false)} />
+      )}
+      {editItem && (
+        <ItemModal
+          mode="edit"
+          initial={{
+            category: editItem.category,
+            name: editItem.name,
+            description: editItem.description ?? "",
+            cost_usd: editItem.cost_usd,
+            cost_type: editItem.cost_type,
+            tier: editItem.tier,
+            source_label: editItem.source_label ?? "",
+            source_url: editItem.source_url ?? "",
+            is_optional: editItem.is_optional,
+            is_included: editItem.is_included,
+          }}
+          onSave={handleEdit}
+          onClose={() => setEditItem(null)}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteModal
+          itemName={deleteTarget.name}
+          onConfirm={() => onDelete(deleteTarget.id)}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
