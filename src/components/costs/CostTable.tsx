@@ -528,7 +528,11 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
             All ({baseItems.length})
           </button>
           {CATEGORIES.map((cat) => {
-            const count = baseItems.filter((i) => i.category === cat.key).length;
+            const count = baseItems.filter(
+              (i) =>
+                i.category === cat.key ||
+                (i.category === "package" && i.package_categories?.includes(cat.key))
+            ).length;
             const Icon = CATEGORY_ICONS[cat.key];
             return (
               <button
@@ -788,6 +792,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
             is_optional: editItem.is_optional,
             is_included: editItem.is_included,
             member_ids: editItem.member_ids,
+            package_categories: editItem.package_categories,
           }}
           members={members}
           onSave={handleEdit}
