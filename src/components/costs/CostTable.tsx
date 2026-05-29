@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import type { BudgetItem } from "../../lib/supabase/types";
+import type { Member } from "../../lib/supabase/types";
 import { CATEGORIES, CATEGORY_MAP } from "../../lib/constants";
 import { formatUSD } from "../../lib/calculations";
 import {
@@ -25,6 +26,7 @@ import {
 
 interface CostTableProps {
   items: BudgetItem[];
+  members: Member[];
   onUpdate: (itemId: string, updates: Partial<BudgetItem>) => Promise<void>;
   onDelete: (itemId: string) => Promise<void>;
   onAdd: (item: Omit<BudgetItem, "id" | "created_at" | "updated_at" | "updated_by">) => Promise<void>;
@@ -41,7 +43,7 @@ const TIER_OPTIONS = [
 ];
 
 const COST_TYPE_OPTIONS = [
-  { value: "per_person", label: "Per Person" },
+  { value: "per_person", label: "Per Member" },
   { value: "total_group", label: "Group Total" },
   { value: "per_room", label: "Per Room" },
 ];
@@ -61,22 +63,35 @@ const EMPTY_ITEM = {
   source_url: "",
   is_optional: false,
   is_included: true,
+  member_ids: null as string[] | null,
 };
 
 /* ─── Modal ─── */
 function ItemModal({
   mode,
   initial,
+  members,
   onSave,
   onClose,
 }: {
   mode: "add" | "edit";
   initial: typeof EMPTY_ITEM;
+  members: Member[];
   onSave: (data: typeof EMPTY_ITEM) => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState(initial);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const activeMembers = members.filter((m) => m.is_active);
+  const activeMemberIds = new Set(activeMembers.map((m) => m.id));
+
+  // Clean stale member_ids (members who were deactivated since assignment)
+  const [form, setForm] = useState(() => {
+    if (initial.member_ids && initial.member_ids.length > 0) {
+      const cleaned = initial.member_ids.filter((id) => activeMemberIds.has(id));
+      return { ...initial, member_ids: cleaned.length > 0 ? cleaned : null };
+    }
+    return initial;
+  });
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -164,7 +179,14 @@ function ItemModal({
               <label className="block text-xs text-gray-500 mb-1.5">Cost Type</label>
               <select
                 value={form.cost_type}
-                onChange={(e) => setForm({ ...form, cost_type: e.target.value as BudgetItem["cost_type"] })}
+                onChange={(e) => {
+                  const newType = e.target.value as BudgetItem["cost_type"];
+                  setForm({
+                    ...form,
+                    cost_type: newType,
+                    member_ids: newType === "per_person" ? form.member_ids : null,
+                  });
+                }}
                 className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 focus:border-sky-600 focus:outline-none"
               >
                 {COST_TYPE_OPTIONS.map((o) => (
@@ -185,6 +207,54 @@ function ItemModal({
               </select>
             </div>
           </div>
+
+          {/* Member Assignment — only for Per Member cost type */}
+          {form.cost_type === "per_person" && activeMembers.length > 0 && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Applies To</label>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, member_ids: null })}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    !form.member_ids || form.member_ids.length === 0
+                      ? "bg-sky-600 text-white"
+                      : "bg-[#222] text-gray-400 hover:bg-[#2a2a2a] hover:text-gray-200"
+                  }`}
+                >
+                  Everyone
+                </button>
+                {activeMembers.map((m) => {
+                  const selected = form.member_ids?.includes(m.id) ?? false;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        const current = form.member_ids ?? [];
+                        const updated = selected
+                          ? current.filter((id) => id !== m.id)
+                          : [...current, m.id];
+                        setForm({ ...form, member_ids: updated.length === 0 ? null : updated });
+                      }}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        selected
+                          ? "bg-sky-600 text-white"
+                          : "bg-[#222] text-gray-400 hover:bg-[#2a2a2a] hover:text-gray-200"
+                      }`}
+                    >
+                      {m.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.member_ids && form.member_ids.length > 0 && (
+                <p className="text-xs text-gray-600 mt-1">
+                  {form.member_ids.length} of {activeMembers.length} members selected
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Source Label + URL */}
           <div className="grid grid-cols-2 gap-3">
@@ -321,7 +391,7 @@ function SortHeader({
 }
 
 /* ─── Main CostTable ─── */
-export default function CostTable({ items, onUpdate, onDelete, onAdd, tripId }: CostTableProps) {
+export default function CostTable({ items, members, onUpdate, onDelete, onAdd, tripId }: CostTableProps) {
   const [filter, setFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("category");
   const [sortAsc, setSortAsc] = useState(true);
@@ -363,6 +433,7 @@ export default function CostTable({ items, onUpdate, onDelete, onAdd, tripId }: 
       sort_order: items.length,
       is_optional: data.is_optional,
       is_included: data.is_included,
+      member_ids: data.member_ids,
     });
     setShowAddModal(false);
   }, [onAdd, tripId, items.length]);
@@ -379,6 +450,7 @@ export default function CostTable({ items, onUpdate, onDelete, onAdd, tripId }: 
       source_label: data.source_label || null,
       source_url: data.source_url || null,
       is_optional: data.is_optional,
+      member_ids: data.member_ids,
     });
     setEditItem(null);
   }, [editItem, onUpdate]);
@@ -492,6 +564,16 @@ export default function CostTable({ items, onUpdate, onDelete, onAdd, tripId }: 
                           <TypeIcon className="w-3.5 h-3.5 text-gray-500" />
                           {costTypeLabel(item.cost_type)}
                         </span>
+                        {item.cost_type === "per_person" && item.member_ids && item.member_ids.length > 0 && (
+                          <p
+                            className="text-[10px] text-sky-400/70 mt-0.5 cursor-default"
+                            title={item.member_ids.map((id) => members.find((m) => m.id === id)?.name ?? id).join(", ")}
+                          >
+                            {item.member_ids.length === 1
+                              ? members.find((m) => m.id === item.member_ids![0])?.name ?? "1 member"
+                              : `${item.member_ids.length} members`}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2.5">
                         <span
@@ -612,7 +694,7 @@ export default function CostTable({ items, onUpdate, onDelete, onAdd, tripId }: 
 
       {/* ── Modals ── */}
       {showAddModal && (
-        <ItemModal mode="add" initial={EMPTY_ITEM} onSave={handleAdd} onClose={() => setShowAddModal(false)} />
+        <ItemModal mode="add" initial={EMPTY_ITEM} members={members} onSave={handleAdd} onClose={() => setShowAddModal(false)} />
       )}
       {editItem && (
         <ItemModal
@@ -628,7 +710,9 @@ export default function CostTable({ items, onUpdate, onDelete, onAdd, tripId }: 
             source_url: editItem.source_url ?? "",
             is_optional: editItem.is_optional,
             is_included: editItem.is_included,
+            member_ids: editItem.member_ids,
           }}
+          members={members}
           onSave={handleEdit}
           onClose={() => setEditItem(null)}
         />

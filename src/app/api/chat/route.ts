@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   const itemsSummary = items
     .map(
       (i) =>
-        `- [id:${i.id}] ${i.name} (${i.category}): $${i.cost_usd} USD, ${i.cost_type}, tier: ${i.tier}${!i.is_included ? " [EXCLUDED from budget]" : ""}${i.is_optional ? " [optional]" : ""}${i.description ? ` — ${i.description}` : ""}${i.source_url ? ` | Source: ${i.source_label ?? i.source_url}` : ""}`
+        `- [id:${i.id}] ${i.name} (${i.category}): $${i.cost_usd} USD, ${i.cost_type}, tier: ${i.tier}${!i.is_included ? " [EXCLUDED from budget]" : ""}${i.is_optional ? " [optional]" : ""}${i.member_ids ? ` [assigned to: ${i.member_ids.map((mid: string) => members.find((m: { id: string }) => m.id === mid)?.name ?? mid).join(", ")}]` : " [all members]"}${i.description ? ` — ${i.description}` : ""}${i.source_url ? ` | Source: ${i.source_label ?? i.source_url}` : ""}`
     )
     .join("\n");
 

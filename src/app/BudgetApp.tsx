@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Header from "../components/layout/Header";
 import TabNav from "../components/layout/TabNav";
-import TierCard from "../components/overview/TierCard";
+import MemberOverviewCard from "../components/overview/TierCard";
 import GroupTotal from "../components/overview/GroupTotal";
 import RateInput from "../components/overview/RateInput";
 import CostTable from "../components/costs/CostTable";
@@ -15,24 +15,55 @@ import TipsTab from "../components/tips/TipsTab";
 import MembersTab from "../components/members/MembersTab";
 import BebbyChat from "../components/chat/BebbyChat";
 import AnimateIn, { staggerDelay } from "../components/ui/AnimateIn";
+import MemberFilter from "../components/ui/MemberFilter";
 import { useTrip } from "../hooks/useTrip";
 import { useBudgetItems } from "../hooks/useBudgetItems";
 import { useItinerary } from "../hooks/useItinerary";
 import { useLinks } from "../hooks/useLinks";
 import { useChats } from "../hooks/useChats";
 import { useMembers } from "../hooks/useMembers";
-import type { TabKey, TierKey } from "../lib/constants";
-
-const tiers: TierKey[] = ["budget", "balanced", "premium"];
+import type { TabKey } from "../lib/constants";
+import type { Member } from "../lib/supabase/types";
 
 export default function BudgetApp() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [chatOpen, setChatOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const { trip, loading: tripLoading, updateTrip } = useTrip();
   const { items, loading: itemsLoading, updateItem, addItem, deleteItem } = useBudgetItems(trip?.id);
   const { days, updateDay, addDay, deleteDay, swapDays } = useItinerary(trip?.id);
   const { links, addLink, updateLink, deleteLink } = useLinks(trip?.id);
   const { members, addMember, updateMember, deleteMember } = useMembers(trip?.id);
+
+  // Strip a member from all budget items' member_ids
+  const removeMemberFromItems = useCallback(
+    (memberId: string) => {
+      for (const item of items) {
+        if (item.member_ids && item.member_ids.includes(memberId)) {
+          const updated = item.member_ids.filter((id) => id !== memberId);
+          updateItem(item.id, { member_ids: updated.length > 0 ? updated : null });
+        }
+      }
+      if (selectedMember === memberId) setSelectedMember(null);
+    },
+    [items, updateItem, selectedMember]
+  );
+
+  const handleUpdateMember = useCallback(
+    async (id: string, updates: Partial<Member>) => {
+      await updateMember(id, updates);
+      if (updates.is_active === false) removeMemberFromItems(id);
+    },
+    [updateMember, removeMemberFromItems]
+  );
+
+  const handleDeleteMember = useCallback(
+    async (id: string) => {
+      removeMemberFromItems(id);
+      await deleteMember(id);
+    },
+    [deleteMember, removeMemberFromItems]
+  );
   const {
     chats, activeChat, activeChatId, setActiveChatId,
     createChat, updateChat, deleteChat,
@@ -67,29 +98,30 @@ export default function BudgetApp() {
       <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+        <div className="mb-6">
+          <RateInput
+            rate={usdToTtd}
+            onSave={(rate) => updateTrip({ usd_to_ttd: rate })}
+          />
+        </div>
         <AnimateIn key={activeTab} animation="fade-up" className="contents">
         {activeTab === "overview" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {tiers.map((tier, i) => (
-                <AnimateIn key={tier} animation="fade-up" delay={staggerDelay(i, 80)}>
-                  <TierCard
-                    tier={tier}
+            <MemberFilter members={members} selected={selectedMember} onChange={setSelectedMember} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {members.filter((m) => m.is_active).filter((m) => !selectedMember || m.id === selectedMember).map((member, i) => (
+                <AnimateIn key={member.id} animation="fade-up" delay={staggerDelay(i, 80)}>
+                  <MemberOverviewCard
+                    member={member}
                     items={items}
-                    groupSize={groupSize}
+                    activeMembers={members.filter((m) => m.is_active)}
                     usdToTtd={usdToTtd}
                   />
                 </AnimateIn>
               ))}
             </div>
-            <AnimateIn animation="fade-up" delay={250}>
-              <RateInput
-                rate={usdToTtd}
-                onSave={(rate) => updateTrip({ usd_to_ttd: rate })}
-              />
-            </AnimateIn>
             <AnimateIn animation="fade-up" delay={320}>
-              <GroupTotal items={items} groupSize={groupSize} usdToTtd={usdToTtd} />
+              <GroupTotal items={items} groupSize={groupSize} usdToTtd={usdToTtd} members={members} selectedMember={selectedMember} />
             </AnimateIn>
           </div>
         )}
@@ -97,6 +129,7 @@ export default function BudgetApp() {
         {activeTab === "costs" && trip && (
           <CostTable
             items={items}
+            members={members}
             onUpdate={updateItem}
             onDelete={deleteItem}
             onAdd={addItem}
@@ -107,7 +140,7 @@ export default function BudgetApp() {
         {activeTab === "compare" && (
           <div className="space-y-6">
             <AnimateIn animation="fade-up">
-              <CompareTable items={items} groupSize={groupSize} usdToTtd={usdToTtd} />
+              <CompareTable items={items} groupSize={groupSize} usdToTtd={usdToTtd} members={members} />
             </AnimateIn>
             <AnimateIn animation="fade-up" delay={120}>
               <FeatureMatrix items={items} />
@@ -125,6 +158,9 @@ export default function BudgetApp() {
             groupSize={groupSize}
             usdToTtd={usdToTtd}
             tripStart={trip?.trip_start ?? null}
+            members={members}
+            selectedMember={selectedMember}
+            onMemberChange={setSelectedMember}
           />
         )}
 
@@ -133,8 +169,8 @@ export default function BudgetApp() {
             members={members}
             tripId={trip.id}
             onAdd={addMember}
-            onUpdate={updateMember}
-            onDelete={deleteMember}
+            onUpdate={handleUpdateMember}
+            onDelete={handleDeleteMember}
           />
         )}
 

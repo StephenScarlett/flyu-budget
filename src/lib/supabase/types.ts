@@ -39,6 +39,7 @@ export interface BudgetItem {
   sort_order: number;
   is_optional: boolean;
   is_included: boolean;
+  member_ids: string[] | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;

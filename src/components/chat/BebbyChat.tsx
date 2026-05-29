@@ -43,7 +43,7 @@ function BebbyAvatar() {
         alt="Bebby"
         width={56}
         height={56}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover object-[50%_15%] scale-[2.2]"
       />
     </div>
   );
@@ -228,7 +228,7 @@ export default function BebbyChat({
                   alt="Bebby"
                   width={72}
                   height={72}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-[50%_15%] scale-[2.2]"
                 />
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#0a0a0a] rounded-full" />

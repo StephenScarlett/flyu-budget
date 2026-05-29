@@ -2,18 +2,19 @@
 
 import { TIER_CONFIG, CATEGORIES, type TierKey } from "../../lib/constants";
 import { convertToTTD, formatUSD, formatTTD, calculateTierTotal } from "../../lib/calculations";
-import type { BudgetItem } from "../../lib/supabase/types";
+import type { BudgetItem, Member } from "../../lib/supabase/types";
 import { TIER_ICONS, CATEGORY_ICONS } from "../../lib/icons";
 
 interface CompareTableProps {
   items: BudgetItem[];
   groupSize: number;
   usdToTtd: number;
+  members: Member[];
 }
 
 const tiers: TierKey[] = ["budget", "balanced", "premium"];
 
-export default function CompareTable({ items, groupSize, usdToTtd }: CompareTableProps) {
+export default function CompareTable({ items, groupSize, usdToTtd, members }: CompareTableProps) {
   function getCategoryTotal(category: string, tier: TierKey): number {
     const catItems = items.filter((i) => i.category === category && i.is_included);
     const included = catItems.filter(

@@ -1,8 +1,18 @@
 import type { BudgetItem } from "./supabase/types";
+import type { Member } from "./supabase/types";
 import type { TierKey } from "./constants";
 
 /**
- * Calculate per-person total for a given tier.
+ * Check if a budget item applies to a specific member.
+ * If member_ids is null/empty, it applies to all members.
+ */
+export function itemAppliesToMember(item: BudgetItem, memberId: string): boolean {
+  if (!item.member_ids || item.member_ids.length === 0) return true;
+  return item.member_ids.includes(memberId);
+}
+
+/**
+ * Calculate per-person total for a given tier (across all members).
  */
 export function calculateTierTotal(
   tier: TierKey,
@@ -25,6 +35,38 @@ export function calculateTierTotal(
   }
 
   return Math.round(perPerson * 100) / 100;
+}
+
+/**
+ * Calculate a specific member's total for a given tier.
+ */
+export function calculateMemberTierTotal(
+  tier: TierKey,
+  items: BudgetItem[],
+  memberId: string,
+  activeMembers: Member[]
+): number {
+  const included = items.filter(
+    (item) =>
+      item.is_included &&
+      itemAppliesToMember(item, memberId) &&
+      (item.tier === "all" || item.tier === tier || item.tier.includes(tier))
+  );
+
+  let total = 0;
+  for (const item of included) {
+    if (item.cost_type === "per_person") {
+      total += item.cost_usd;
+    } else if (item.cost_type === "total_group") {
+      // Divide by number of members this item applies to
+      const applicableCount = item.member_ids?.length || activeMembers.length;
+      total += item.cost_usd / applicableCount;
+    } else if (item.cost_type === "per_room") {
+      total += item.cost_usd / 2;
+    }
+  }
+
+  return Math.round(total * 100) / 100;
 }
 
 /**

@@ -1,61 +1,78 @@
 "use client";
 
-import { TIER_CONFIG, MILESTONES, type TierKey } from "../../lib/constants";
+import { MILESTONES } from "../../lib/constants";
 import {
-  calculateTierTotal,
+  calculateMemberTierTotal,
   calculateMonthlySavings,
   convertToTTD,
   formatUSD,
   formatTTD,
 } from "../../lib/calculations";
-import type { BudgetItem } from "../../lib/supabase/types";
-import { TIER_ICONS, ClipboardList, PartyPopper } from "../../lib/icons";
+import type { BudgetItem, Member } from "../../lib/supabase/types";
+import { ClipboardList, PartyPopper } from "../../lib/icons";
 
 const staggerDelay = (i: number, base = 80) => i * base;
+
+import MemberFilter from "../ui/MemberFilter";
 
 interface SavingsTabProps {
   items: BudgetItem[];
   groupSize: number;
   usdToTtd: number;
   tripStart: string | null;
+  members: Member[];
+  selectedMember: string | null;
+  onMemberChange: (id: string | null) => void;
 }
 
-const tiers: TierKey[] = ["budget", "balanced", "premium"];
-
-export default function SavingsTab({ items, groupSize, usdToTtd, tripStart }: SavingsTabProps) {
+export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, members, selectedMember, onMemberChange }: SavingsTabProps) {
+  const activeMembers = members.filter((m) => m.is_active);
+  const filteredMembers = selectedMember ? activeMembers.filter((m) => m.id === selectedMember) : activeMembers;
   return (
     <div className="space-y-6">
-      {/* Savings Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {tiers.map((tier, i) => {
-          const config = TIER_CONFIG[tier];
-          const total = calculateTierTotal(tier, items, groupSize);
-          const monthly = calculateMonthlySavings(total, tripStart);
-          const monthlyTTD = convertToTTD(monthly, usdToTtd);
-
-          return (
-            <div
-              key={tier}
-              className={`rounded-xl border ${config.border} ${config.bg} p-6 text-center animate-fade-up`}
-              style={{ animationDelay: `${staggerDelay(i)}ms` }}
-            >
-              {(() => { const Icon = TIER_ICONS[tier]; return <Icon className={`w-7 h-7 mx-auto ${config.iconColor}`} />; })()}
-              <h3 className={`text-lg font-bold ${config.color} mt-2`}>
-                {config.label}
-              </h3>
-              <p className="text-xs text-gray-500 mt-1 mb-3">Save monthly</p>
-              <p className={`text-2xl font-extrabold ${config.color}`}>
-                {formatUSD(monthly)}
-              </p>
-              <p className="text-sm text-gray-400">{formatTTD(monthlyTTD)}/mo</p>
-              <hr className={`my-3 ${config.border}`} />
-              <p className="text-xs text-gray-500">
-                Total: {formatUSD(total)} / {formatTTD(convertToTTD(total, usdToTtd))}
-              </p>
-            </div>
-          );
-        })}
-      </div>
+      <MemberFilter members={members} selected={selectedMember} onChange={onMemberChange} />
+      {/* Per-Member Savings */}
+      {filteredMembers.length > 0 && (
+        <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-800">
+            <h3 className="font-semibold text-white inline-flex items-center gap-2">
+              <PartyPopper className="w-5 h-5 text-sky-400" />
+              Member Savings
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Personalized monthly savings per member (Balanced tier)
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#1a1a1a] text-left">
+                  <th className="px-6 py-3 font-medium text-gray-400">Member</th>
+                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Total (USD)</th>
+                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Total (TTD)</th>
+                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Monthly (USD)</th>
+                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Monthly (TTD)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {filteredMembers.map((member) => {
+                  const total = calculateMemberTierTotal("balanced", items, member.id, activeMembers);
+                  const monthly = calculateMonthlySavings(total, tripStart);
+                  return (
+                    <tr key={member.id} className="hover:bg-[#1a1a1a]">
+                      <td className="px-6 py-3 font-medium text-gray-200">{member.name}</td>
+                      <td className="px-6 py-3 text-right font-mono text-gray-200">{formatUSD(total)}</td>
+                      <td className="px-6 py-3 text-right font-mono text-gray-500">{formatTTD(convertToTTD(total, usdToTtd))}</td>
+                      <td className="px-6 py-3 text-right font-mono font-semibold text-sky-300">{formatUSD(monthly)}</td>
+                      <td className="px-6 py-3 text-right font-mono text-gray-500">{formatTTD(convertToTTD(monthly, usdToTtd))}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Milestones */}
       <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">
@@ -118,6 +135,7 @@ export default function SavingsTab({ items, groupSize, usdToTtd, tripStart }: Sa
           })}
         </div>
       </div>
+
     </div>
   );
 }
