@@ -647,7 +647,10 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                           {CATEGORY_MAP[item.category as keyof typeof CATEGORY_MAP]?.label ?? item.category}
                         </span>
                         {item.category === "package" && item.package_categories && item.package_categories.length > 0 && (
-                          <p className="text-[10px] text-sky-400/70 mt-0.5">
+                          <p
+                            className="text-[10px] text-sky-400/70 mt-0.5 cursor-default"
+                            title={`Includes: ${item.package_categories.map((k) => CATEGORY_MAP[k as keyof typeof CATEGORY_MAP]?.label ?? k).join(", ")}`}
+                          >
                             {item.package_categories.length} {item.package_categories.length === 1 ? "category" : "categories"}
                           </p>
                         )}
@@ -670,7 +673,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                         {formatUSD(item.cost_usd)}
                       </td>
                       <td className="px-3 py-2.5 hidden lg:table-cell">
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-400 cursor-default">
                           <TypeIcon className="w-3.5 h-3.5 text-gray-500" />
                           {costTypeLabel(item.cost_type)}
                         </span>
