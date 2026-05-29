@@ -128,10 +128,17 @@ export default function Landing({ members, onEnter, onMemberClick }: LandingProp
           </div>
 
           {/* Hovered member indicator below photo */}
-          <div className="h-8 mt-3 text-center">
-            {hoveredName && (
-              <p className="text-sm text-gray-400 animate-fade-in" style={{ animationDuration: "150ms" }}>
-                Click to view <span className="text-sky-300 font-medium">{findMember(hoveredName)?.name ?? hoveredName}</span>&apos;s profile
+          <div className="h-6 mt-3 text-center">
+            {hoveredName ? (
+              <p className="text-sm text-sky-300/80 font-medium animate-fade-in" style={{ animationDuration: "150ms" }}>
+                {findMember(hoveredName)?.name ?? hoveredName}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-600 animate-fade-in flex items-center justify-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.834.166-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243-1.59-1.59" />
+                </svg>
+                tap anyone
               </p>
             )}
           </div>
