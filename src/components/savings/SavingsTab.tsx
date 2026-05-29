@@ -21,16 +21,16 @@ interface SavingsTabProps {
   usdToTtd: number;
   tripStart: string | null;
   members: Member[];
-  selectedMember: string | null;
-  onMemberChange: (id: string | null) => void;
+  selectedMembers: string[];
+  onMemberChange: (ids: string[]) => void;
 }
 
-export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, members, selectedMember, onMemberChange }: SavingsTabProps) {
+export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, members, selectedMembers, onMemberChange }: SavingsTabProps) {
   const activeMembers = members.filter((m) => m.is_active);
-  const filteredMembers = selectedMember ? activeMembers.filter((m) => m.id === selectedMember) : activeMembers;
+  const filteredMembers = selectedMembers.length > 0 ? activeMembers.filter((m) => selectedMembers.includes(m.id)) : activeMembers;
   return (
     <div className="space-y-6">
-      <MemberFilter members={members} selected={selectedMember} onChange={onMemberChange} />
+      <MemberFilter members={members} selected={selectedMembers} onChange={onMemberChange} />
       {/* Per-Member Savings */}
       {filteredMembers.length > 0 && (
         <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">

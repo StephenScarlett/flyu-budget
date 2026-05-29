@@ -28,7 +28,7 @@ import type { Member } from "../lib/supabase/types";
 export default function BudgetApp() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [chatOpen, setChatOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const { trip, loading: tripLoading, updateTrip } = useTrip();
   const { items, loading: itemsLoading, updateItem, addItem, deleteItem } = useBudgetItems(trip?.id);
   const { days, updateDay, addDay, deleteDay, swapDays } = useItinerary(trip?.id);
@@ -44,9 +44,9 @@ export default function BudgetApp() {
           updateItem(item.id, { member_ids: updated.length > 0 ? updated : null });
         }
       }
-      if (selectedMember === memberId) setSelectedMember(null);
+      if (selectedMembers.includes(memberId)) setSelectedMembers(selectedMembers.filter((id) => id !== memberId));
     },
-    [items, updateItem, selectedMember]
+    [items, updateItem, selectedMembers]
   );
 
   const handleUpdateMember = useCallback(
@@ -105,9 +105,9 @@ export default function BudgetApp() {
               rate={usdToTtd}
               onSave={(rate) => updateTrip({ usd_to_ttd: rate })}
             />
-            <MemberFilter members={members} selected={selectedMember} onChange={setSelectedMember} />
+            <MemberFilter members={members} selected={selectedMembers} onChange={setSelectedMembers} />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {members.filter((m) => m.is_active).filter((m) => !selectedMember || m.id === selectedMember).map((member, i) => (
+              {members.filter((m) => m.is_active).filter((m) => selectedMembers.length === 0 || selectedMembers.includes(m.id)).map((member, i) => (
                 <AnimateIn key={member.id} animation="fade-up" delay={staggerDelay(i, 80)}>
                   <MemberOverviewCard
                     member={member}
@@ -119,7 +119,7 @@ export default function BudgetApp() {
               ))}
             </div>
             <AnimateIn animation="fade-up" delay={320}>
-              <GroupTotal items={items} groupSize={groupSize} usdToTtd={usdToTtd} members={members} selectedMember={selectedMember} />
+              <GroupTotal items={items} groupSize={groupSize} usdToTtd={usdToTtd} members={members} selectedMembers={selectedMembers} />
             </AnimateIn>
           </div>
         )}
@@ -157,8 +157,8 @@ export default function BudgetApp() {
             usdToTtd={usdToTtd}
             tripStart={trip?.trip_start ?? null}
             members={members}
-            selectedMember={selectedMember}
-            onMemberChange={setSelectedMember}
+            selectedMembers={selectedMembers}
+            onMemberChange={setSelectedMembers}
           />
         )}
 

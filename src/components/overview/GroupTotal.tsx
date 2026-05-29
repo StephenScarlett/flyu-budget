@@ -9,12 +9,12 @@ interface GroupTotalProps {
   groupSize: number;
   usdToTtd: number;
   members: Member[];
-  selectedMember: string | null;
+  selectedMembers: string[];
 }
 
 const tiers: TierKey[] = ["budget", "balanced", "premium"];
 
-export default function GroupTotal({ items, groupSize, usdToTtd, members, selectedMember }: GroupTotalProps) {
+export default function GroupTotal({ items, groupSize, usdToTtd, members, selectedMembers }: GroupTotalProps) {
   const activeMembers = members.filter((m) => m.is_active);
 
   if (activeMembers.length === 0) return null;
@@ -37,7 +37,7 @@ export default function GroupTotal({ items, groupSize, usdToTtd, members, select
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {(selectedMember ? activeMembers.filter((m) => m.id === selectedMember) : activeMembers).map((member) => (
+                {(selectedMembers.length > 0 ? activeMembers.filter((m) => selectedMembers.includes(m.id)) : activeMembers).map((member) => (
                   <tr key={member.id} className="hover:bg-[#1a1a1a]">
                     <td className="px-6 py-3 font-medium text-gray-200">{member.name}</td>
                     {tiers.map((tier) => {

@@ -437,7 +437,7 @@ function SortHeader({
 
 /* ─── Main CostTable ─── */
 export default function CostTable({ items, members, onUpdate, onDelete, onAdd, tripId }: CostTableProps) {
-  const [filter, setFilter] = useState<string>("all");
+  const [filters, setFilters] = useState<string[]>([]);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<SortField>("category");
@@ -451,12 +451,12 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const baseItems = showActiveOnly ? items.filter((i) => i.is_included) : items;
-  const filtered = filter === "all"
+  const filtered = filters.length === 0
     ? baseItems
     : baseItems.filter(
         (i) =>
-          i.category === filter ||
-          (i.category === "package" && i.package_categories?.includes(filter))
+          filters.includes(i.category) ||
+          (i.category === "package" && i.package_categories?.some((pc) => filters.includes(pc)))
       );
 
   const sorted = [...filtered].sort((a, b) => {
@@ -472,7 +472,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
   const paged = sorted.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   // Reset page when filter changes
-  useEffect(() => { setPage(0); }, [filter, showActiveOnly]);
+  useEffect(() => { setPage(0); }, [filters, showActiveOnly]);
 
   function handleSort(field: SortField) {
     if (sortField === field) setSortAsc(!sortAsc);
@@ -524,16 +524,16 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
-              filter !== "all"
+              filters.length > 0
                 ? "bg-sky-600/20 text-sky-400 border border-sky-600/40"
                 : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Filters</span>
-            {filter !== "all" && (
+            {filters.length > 0 && (
               <span className="bg-sky-600 text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
-                {CATEGORIES.find((c) => c.key === filter)?.label ?? filter}
+                {filters.length}
               </span>
             )}
           </button>
@@ -566,9 +566,9 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
       {showFilters && (
         <div className="flex flex-wrap gap-1.5 mb-3 animate-fade-up" style={{ animationDuration: '150ms' }}>
           <button
-            onClick={() => setFilter("all")}
+            onClick={() => setFilters([])}
             className={`px-3 py-2 rounded-full text-xs font-medium transition-colors ${
-              filter === "all"
+              filters.length === 0
                 ? "bg-sky-600 text-white"
                 : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
             }`}
@@ -582,12 +582,15 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                 (i.category === "package" && i.package_categories?.includes(cat.key))
             ).length;
             const Icon = CATEGORY_ICONS[cat.key];
+            const isActive = filters.includes(cat.key);
             return (
               <button
                 key={cat.key}
-                onClick={() => setFilter(cat.key)}
+                onClick={() =>
+                  setFilters(isActive ? filters.filter((f) => f !== cat.key) : [...filters, cat.key])
+                }
                 className={`px-3 py-2 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
-                  filter === cat.key
+                  isActive
                     ? "bg-sky-600 text-white"
                     : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
                 }`}
