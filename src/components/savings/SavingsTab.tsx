@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { MILESTONES } from "../../lib/constants";
 import {
   calculateMemberTierTotal,
@@ -9,11 +10,13 @@ import {
   formatTTD,
 } from "../../lib/calculations";
 import type { BudgetItem, Member } from "../../lib/supabase/types";
-import { ClipboardList, PartyPopper } from "../../lib/icons";
+import { ClipboardList, PartyPopper, ChevronUp, ChevronDown, ChevronsUpDown } from "../../lib/icons";
 
 const staggerDelay = (i: number, base = 80) => i * base;
 
 import MemberFilter from "../ui/MemberFilter";
+
+type SavingsSortField = "name" | "totalUsd" | "totalTtd" | "monthlyUsd" | "monthlyTtd";
 
 interface SavingsTabProps {
   items: BudgetItem[];
@@ -28,11 +31,50 @@ interface SavingsTabProps {
 export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, members, selectedMembers, onMemberChange }: SavingsTabProps) {
   const activeMembers = members.filter((m) => m.is_active);
   const filteredMembers = selectedMembers.length > 0 ? activeMembers.filter((m) => selectedMembers.includes(m.id)) : activeMembers;
+  const [sortField, setSortField] = useState<SavingsSortField>("name");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = (field: SavingsSortField) => {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(field === "name"); }
+  };
+
+  const sorted = useMemo(() => {
+    const rows = filteredMembers.map((m) => {
+      const totalUsd = calculateMemberTierTotal("balanced", items, m.id, activeMembers);
+      const monthlyUsd = calculateMonthlySavings(totalUsd, tripStart);
+      return {
+        member: m,
+        totalUsd,
+        totalTtd: convertToTTD(totalUsd, usdToTtd),
+        monthlyUsd,
+        monthlyTtd: convertToTTD(monthlyUsd, usdToTtd),
+      };
+    });
+    return rows.sort((a, b) => {
+      const dir = sortAsc ? 1 : -1;
+      if (sortField === "name") return a.member.name.localeCompare(b.member.name) * dir;
+      return (a[sortField] - b[sortField]) * dir;
+    });
+  }, [filteredMembers, items, activeMembers, tripStart, usdToTtd, sortField, sortAsc]);
+
+  const SortTh = ({ field, label, className = "" }: { field: SavingsSortField; label: string; className?: string }) => {
+    const active = sortField === field;
+    return (
+      <th className={`px-6 py-3 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap ${className}`} onClick={() => handleSort(field)}>
+        <span className="inline-flex items-center gap-1 justify-end">
+          {label}
+          {active ? (sortAsc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />) : <ChevronsUpDown className="w-3.5 h-3.5 opacity-30" />}
+        </span>
+      </th>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <MemberFilter members={members} selected={selectedMembers} onChange={onMemberChange} />
       {/* Per-Member Savings */}
-      {filteredMembers.length > 0 && (
+      {sorted.length > 0 && (
         <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-800">
             <h3 className="font-semibold text-white inline-flex items-center gap-2">
@@ -47,27 +89,23 @@ export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, memb
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#1a1a1a] text-left">
-                  <th className="px-6 py-3 font-medium text-gray-400">Member</th>
-                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Total (USD)</th>
-                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Total (TTD)</th>
-                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Monthly (USD)</th>
-                  <th className="px-6 py-3 font-medium text-gray-400 text-right">Monthly (TTD)</th>
+                  <SortTh field="name" label="Member" className="text-gray-400" />
+                  <SortTh field="totalUsd" label="Total (USD)" className="text-gray-400 text-right" />
+                  <SortTh field="totalTtd" label="Total (TTD)" className="text-gray-400 text-right" />
+                  <SortTh field="monthlyUsd" label="Monthly (USD)" className="text-gray-400 text-right" />
+                  <SortTh field="monthlyTtd" label="Monthly (TTD)" className="text-gray-400 text-right" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {filteredMembers.map((member) => {
-                  const total = calculateMemberTierTotal("balanced", items, member.id, activeMembers);
-                  const monthly = calculateMonthlySavings(total, tripStart);
-                  return (
-                    <tr key={member.id} className="hover:bg-[#1a1a1a]">
-                      <td className="px-6 py-3 font-medium text-gray-200">{member.name}</td>
-                      <td className="px-6 py-3 text-right font-mono text-gray-200">{formatUSD(total)}</td>
-                      <td className="px-6 py-3 text-right font-mono text-gray-500">{formatTTD(convertToTTD(total, usdToTtd))}</td>
-                      <td className="px-6 py-3 text-right font-mono font-semibold text-sky-300">{formatUSD(monthly)}</td>
-                      <td className="px-6 py-3 text-right font-mono text-gray-500">{formatTTD(convertToTTD(monthly, usdToTtd))}</td>
-                    </tr>
-                  );
-                })}
+                {sorted.map(({ member, totalUsd, totalTtd, monthlyUsd, monthlyTtd }) => (
+                  <tr key={member.id} className="hover:bg-[#1a1a1a]">
+                    <td className="px-6 py-3 font-medium text-gray-200">{member.name}</td>
+                    <td className="px-6 py-3 text-right font-mono text-gray-200">{formatUSD(totalUsd)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-gray-500">{formatTTD(totalTtd)}</td>
+                    <td className="px-6 py-3 text-right font-mono font-semibold text-sky-300">{formatUSD(monthlyUsd)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-gray-500">{formatTTD(monthlyTtd)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

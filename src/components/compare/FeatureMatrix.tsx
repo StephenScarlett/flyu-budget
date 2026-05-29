@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useState, useMemo } from "react";
 import { TIER_CONFIG, CATEGORIES, type TierKey } from "../../lib/constants";
 import type { BudgetItem } from "../../lib/supabase/types";
-import { Check, X, CATEGORY_ICONS } from "../../lib/icons";
+import { Check, X, CATEGORY_ICONS, ChevronUp, ChevronDown, ChevronsUpDown } from "../../lib/icons";
 
 interface FeatureMatrixProps {
   items: BudgetItem[];
@@ -15,15 +15,45 @@ function itemIncludedInTier(item: BudgetItem, tier: TierKey): boolean {
   return item.tier === "all" || item.tier === tier || item.tier.includes(tier);
 }
 
+type FeatureSortField = "name" | "budget" | "balanced" | "premium";
+
 export default function FeatureMatrix({ items }: FeatureMatrixProps) {
-  // Group items by category, preserving CATEGORIES order
-  const grouped = CATEGORIES
-    .map((cat) => ({
-      key: cat.key,
-      label: cat.label,
-      items: items.filter((i) => i.category === cat.key && i.is_included),
-    }))
-    .filter((g) => g.items.length > 0);
+  const [sortField, setSortField] = useState<FeatureSortField>("name");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = (field: FeatureSortField) => {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(field === "name"); }
+  };
+
+  // Group items by category, sort items within each group
+  const grouped = useMemo(() => {
+    return CATEGORIES
+      .map((cat) => ({
+        key: cat.key,
+        label: cat.label,
+        items: [...items.filter((i) => i.category === cat.key && i.is_included)].sort((a, b) => {
+          const dir = sortAsc ? 1 : -1;
+          if (sortField === "name") return a.name.localeCompare(b.name) * dir;
+          const aVal = itemIncludedInTier(a, sortField) ? 1 : 0;
+          const bVal = itemIncludedInTier(b, sortField) ? 1 : 0;
+          return (aVal - bVal) * dir;
+        }),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [items, sortField, sortAsc]);
+
+  const SortTh = ({ field, label, className = "" }: { field: FeatureSortField; label: string; className?: string }) => {
+    const active = sortField === field;
+    return (
+      <th className={`px-6 py-3 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap ${className}`} onClick={() => handleSort(field)}>
+        <span className="inline-flex items-center gap-1 justify-end">
+          {label}
+          {active ? (sortAsc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />) : <ChevronsUpDown className="w-3.5 h-3.5 opacity-30" />}
+        </span>
+      </th>
+    );
+  };
 
   return (
     <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">
@@ -34,14 +64,9 @@ export default function FeatureMatrix({ items }: FeatureMatrixProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#1a1a1a]">
-              <th className="px-6 py-3 text-left font-medium text-gray-400">Feature</th>
+              <SortTh field="name" label="Feature" className="text-left text-gray-400" />
               {tiers.map((tier) => (
-                <th
-                  key={tier}
-                  className={`px-6 py-3 text-center font-medium ${TIER_CONFIG[tier].color}`}
-                >
-                  {TIER_CONFIG[tier].label}
-                </th>
+                <SortTh key={tier} field={tier} label={TIER_CONFIG[tier].label} className={`text-center ${TIER_CONFIG[tier].color}`} />
               ))}
             </tr>
           </thead>

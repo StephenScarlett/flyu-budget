@@ -1,9 +1,10 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { TIER_CONFIG, CATEGORIES, type TierKey } from "../../lib/constants";
 import { convertToTTD, formatUSD, formatTTD, calculateTierTotal } from "../../lib/calculations";
 import type { BudgetItem, Member } from "../../lib/supabase/types";
-import { TIER_ICONS, CATEGORY_ICONS } from "../../lib/icons";
+import { TIER_ICONS, CATEGORY_ICONS, ChevronUp, ChevronDown, ChevronsUpDown } from "../../lib/icons";
 
 interface CompareTableProps {
   items: BudgetItem[];
@@ -12,9 +13,19 @@ interface CompareTableProps {
   members: Member[];
 }
 
+type CompareSortField = "category" | "budget" | "balanced" | "premium";
+
 const tiers: TierKey[] = ["budget", "balanced", "premium"];
 
 export default function CompareTable({ items, groupSize, usdToTtd, members }: CompareTableProps) {
+  const [sortField, setSortField] = useState<CompareSortField>("category");
+  const [sortAsc, setSortAsc] = useState(true);
+
+  const handleSort = (field: CompareSortField) => {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(field === "category"); }
+  };
+
   function getCategoryTotal(category: string, tier: TierKey): number {
     const catItems = items.filter((i) => i.category === category && i.is_included);
     const included = catItems.filter(
@@ -30,51 +41,69 @@ export default function CompareTable({ items, groupSize, usdToTtd, members }: Co
     return total;
   }
 
+  const rows = useMemo(() => {
+    const data = CATEGORIES
+      .filter((cat) => items.some((i) => i.category === cat.key))
+      .map((cat) => ({
+        key: cat.key,
+        label: cat.label,
+        budget: getCategoryTotal(cat.key, "budget"),
+        balanced: getCategoryTotal(cat.key, "balanced"),
+        premium: getCategoryTotal(cat.key, "premium"),
+      }));
+    return data.sort((a, b) => {
+      const dir = sortAsc ? 1 : -1;
+      if (sortField === "category") return a.label.localeCompare(b.label) * dir;
+      return (a[sortField] - b[sortField]) * dir;
+    });
+  }, [items, sortField, sortAsc, groupSize]);
+
+  const SortTh = ({ field, label, className = "", children }: { field: CompareSortField; label: string; className?: string; children?: React.ReactNode }) => {
+    const active = sortField === field;
+    return (
+      <th className={`px-6 py-3 font-medium cursor-pointer hover:text-gray-200 select-none whitespace-nowrap ${className}`} onClick={() => handleSort(field)}>
+        <span className="inline-flex items-center gap-1 justify-end">
+          {children ?? label}
+          {active ? (sortAsc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />) : <ChevronsUpDown className="w-3.5 h-3.5 opacity-30" />}
+        </span>
+      </th>
+    );
+  };
+
   return (
     <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[#1a1a1a]">
-              <th className="px-6 py-3 text-left font-medium text-gray-400">Category</th>
+              <SortTh field="category" label="Category" className="text-left text-gray-400" />
               {tiers.map((tier) => {
                 const Icon = TIER_ICONS[tier];
                 return (
-                  <th
-                    key={tier}
-                    className={`px-6 py-3 text-right font-medium ${TIER_CONFIG[tier].color}`}
-                  >
-                    <span className="inline-flex items-center gap-1.5 justify-end">
-                      <Icon className={`w-4 h-4 ${TIER_CONFIG[tier].iconColor}`} />
-                      {TIER_CONFIG[tier].label}
-                    </span>
-                  </th>
+                  <SortTh key={tier} field={tier} label={TIER_CONFIG[tier].label} className={`text-right ${TIER_CONFIG[tier].color}`}>
+                    <Icon className={`w-4 h-4 ${TIER_CONFIG[tier].iconColor}`} />
+                    {TIER_CONFIG[tier].label}
+                  </SortTh>
                 );
               })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {CATEGORIES.map((cat) => {
-              const hasItems = items.some((i) => i.category === cat.key);
-              if (!hasItems) return null;
-              const CatIcon = CATEGORY_ICONS[cat.key];
-
+            {rows.map((row) => {
+              const CatIcon = CATEGORY_ICONS[row.key];
               return (
-                <tr key={cat.key} className="hover:bg-[#1a1a1a]">
+                <tr key={row.key} className="hover:bg-[#1a1a1a]">
                   <td className="px-6 py-3 font-medium text-gray-300">
                     <span className="inline-flex items-center gap-1.5">
                       {CatIcon && <CatIcon className="w-4 h-4 text-sky-400" />}
-                      {cat.label}
+                      {row.label}
                     </span>
                   </td>
-                  {tiers.map((tier) => {
-                    const total = getCategoryTotal(cat.key, tier);
-                    return (
-                      <td key={tier} className="px-6 py-3 text-right font-mono text-gray-200">
-                        {formatUSD(total)}
-                      </td>
-                    );
-                  })}
+                  {tiers.map((tier) => (
+                    <td key={tier} className="px-6 py-3 text-right font-mono text-gray-200">
+                      {formatUSD(row[tier])}
+                    </td>
+                  ))}
                 </tr>
               );
             })}
