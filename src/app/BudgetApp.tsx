@@ -98,15 +98,13 @@ export default function BudgetApp() {
       <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
-        <div className="mb-6">
-          <RateInput
-            rate={usdToTtd}
-            onSave={(rate) => updateTrip({ usd_to_ttd: rate })}
-          />
-        </div>
         <AnimateIn key={activeTab} animation="fade-up" className="contents">
         {activeTab === "overview" && (
           <div className="space-y-6">
+            <RateInput
+              rate={usdToTtd}
+              onSave={(rate) => updateTrip({ usd_to_ttd: rate })}
+            />
             <MemberFilter members={members} selected={selectedMember} onChange={setSelectedMember} />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {members.filter((m) => m.is_active).filter((m) => !selectedMember || m.id === selectedMember).map((member, i) => (
