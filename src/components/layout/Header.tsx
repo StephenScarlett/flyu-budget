@@ -10,9 +10,10 @@ interface HeaderProps {
   trip: Trip | null;
   onUpdate?: (updates: Partial<Trip>) => Promise<void>;
   onOpenChat?: () => void;
+  onLogoClick?: () => void;
 }
 
-export default function Header({ trip, onUpdate, onOpenChat }: HeaderProps) {
+export default function Header({ trip, onUpdate, onOpenChat, onLogoClick }: HeaderProps) {
   const [editing, setEditing] = useState(false);
   const [start, setStart] = useState(trip?.trip_start ?? "");
   const [end, setEnd] = useState(trip?.trip_end ?? "");
@@ -62,19 +63,21 @@ export default function Header({ trip, onUpdate, onOpenChat }: HeaderProps) {
     <header className="bg-black border-b border-gray-800 text-white animate-fade-down relative z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/logo.png"
-              alt="FLYU Nation"
-              width={56}
-              height={56}
-              className="rounded-lg"
-            />
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button onClick={onLogoClick} className="flex-shrink-0 cursor-pointer" title="Back to landing">
+              <Image
+                src="/logo.png"
+                alt="FLYU Nation"
+                width={56}
+                height={56}
+                className="rounded-lg w-10 h-10 sm:w-14 sm:h-14"
+              />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white truncate">
                 FLYU <span className="text-sky-300">Orlando 2027</span>
               </h1>
-              <p className="text-gray-400 text-xs mt-0.5">
+              <p className="text-gray-400 text-xs mt-0.5 truncate">
                 {trip?.destination ?? "Orlando, FL"} •{" "}
                 {trip?.group_size ?? 7} travelers •{" "}
                 {trip?.num_nights ?? 6} nights
@@ -84,10 +87,10 @@ export default function Header({ trip, onUpdate, onOpenChat }: HeaderProps) {
             {/* Ask Bebby button */}
             <button
               onClick={onOpenChat}
-              className="ml-2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1a1a1a] border border-gray-700 hover:border-sky-500 hover:bg-[#222] transition-all group"
+              className="ml-1 sm:ml-2 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-full bg-[#1a1a1a] border border-gray-700 hover:border-sky-500 hover:bg-[#222] transition-all group flex-shrink-0"
               title="Ask Bebby"
             >
-              <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full overflow-hidden flex-shrink-0">
                 <Image
                   src="/bebby.png"
                   alt="Bebby"

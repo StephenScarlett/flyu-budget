@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FLYU Zone Calibrator</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; color: #eee; font-family: system-ui, sans-serif; padding: 20px; }
+  h1 { font-size: 1.4rem; margin-bottom: 8px; color: #7dd3fc; }
+  .instructions { color: #888; font-size: 0.85rem; margin-bottom: 16px; line-height: 1.5; }
+  .instructions strong { color: #eee; }
+  .container { display: flex; gap: 24px; flex-wrap: wrap; }
+  .photo-wrap { position: relative; display: inline-block; cursor: crosshair; }
+  .photo-wrap img { max-width: 800px; width: 100%; display: block; border-radius: 12px; }
+  .zone { position: absolute; border: 2px solid rgba(56, 189, 248, 0.7); background: rgba(56, 189, 248, 0.12); border-radius: 6px; pointer-events: none; }
+  .zone .label { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #7dd3fc; font-size: 11px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .zone.active { border-color: #f59e0b; background: rgba(245, 158, 11, 0.15); }
+  .zone.drawing { border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.1); }
+  .sidebar { min-width: 320px; }
+  .member-list { list-style: none; margin-bottom: 16px; }
+  .member-list li { padding: 8px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-size: 0.9rem; border: 1px solid #333; }
+  .member-list li:hover { border-color: #555; }
+  .member-list li.active { border-color: #f59e0b; background: #292211; }
+  .member-list li.done { border-color: #22c55e; background: #0f2918; }
+  .member-list li .coords { font-size: 0.75rem; color: #888; margin-top: 2px; }
+  .output { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px; font-family: 'Fira Code', monospace; font-size: 0.8rem; white-space: pre-wrap; color: #a3e635; max-height: 300px; overflow-y: auto; }
+  .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+  .btn-copy { background: #0ea5e9; color: white; margin-top: 12px; }
+  .btn-copy:hover { background: #0284c7; }
+  .btn-reset { background: #333; color: #ccc; margin-top: 8px; margin-left: 8px; }
+  .btn-reset:hover { background: #444; }
+</style>
+</head>
+<body>
+
+<h1>Zone Calibrator</h1>
+<div class="instructions">
+  <strong>How to use:</strong> Click a name on the right, then click+drag a rectangle over that person in the photo. Repeat for each person. When done, copy the output code at the bottom.
+</div>
+
+<div class="container">
+  <div class="photo-wrap" id="photoWrap">
+    <img src="group.jpg" id="photo" draggable="false" />
+    <div id="zones"></div>
+    <div id="drawBox" class="zone drawing" style="display:none;"></div>
+  </div>
+
+  <div class="sidebar">
+    <ul class="member-list" id="memberList"></ul>
+    <h3 style="font-size: 0.9rem; margin-bottom: 8px; color: #888;">Output (paste into Landing.tsx)</h3>
+    <div class="output" id="output">Select members and draw zones...</div>
+    <div>
+      <button class="btn btn-copy" onclick="copyOutput()">Copy to Clipboard</button>
+      <button class="btn btn-reset" onclick="resetAll()">Reset All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MEMBERS = [
+  { name: "Kiran", fullHint: "Far left" },
+  { name: "Stephen", fullHint: "Second from left" },
+  { name: "Shania", fullHint: "Front center (girl)" },
+  { name: "Tyler", fullHint: "Back center" },
+  { name: "Cameron", fullHint: "Right of center" },
+  { name: "Zachary", fullHint: "Far right" },
+];
+
+let zones = {}; // name -> {x, y, w, h} as percentages
+let activeMember = null;
+let isDrawing = false;
+let startX = 0, startY = 0;
+
+const photoWrap = document.getElementById('photoWrap');
+const photo = document.getElementById('photo');
+const zonesEl = document.getElementById('zones');
+const drawBox = document.getElementById('drawBox');
+const memberList = document.getElementById('memberList');
+const outputEl = document.getElementById('output');
+
+// Build member list
+MEMBERS.forEach(m => {
+  const li = document.createElement('li');
+  li.dataset.name = m.name;
+  li.innerHTML = `<strong>${m.name}</strong> <span style="color:#666">(${m.fullHint})</span><div class="coords" id="coords-${m.name}">Not set</div>`;
+  li.onclick = () => selectMember(m.name);
+  memberList.appendChild(li);
+});
+
+function selectMember(name) {
+  activeMember = name;
+  document.querySelectorAll('.member-list li').forEach(li => {
+    li.classList.toggle('active', li.dataset.name === name);
+  });
+}
+
+function getRelativePos(e) {
+  const rect = photo.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * 100;
+  const y = ((e.clientY - rect.top) / rect.height) * 100;
+  return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+}
+
+photoWrap.addEventListener('mousedown', (e) => {
+  if (!activeMember) return;
+  e.preventDefault();
+  isDrawing = true;
+  const pos = getRelativePos(e);
+  startX = pos.x;
+  startY = pos.y;
+  drawBox.style.display = 'block';
+  drawBox.style.left = startX + '%';
+  drawBox.style.top = startY + '%';
+  drawBox.style.width = '0%';
+  drawBox.style.height = '0%';
+});
+
+photoWrap.addEventListener('mousemove', (e) => {
+  if (!isDrawing) return;
+  const pos = getRelativePos(e);
+  const x = Math.min(startX, pos.x);
+  const y = Math.min(startY, pos.y);
+  const w = Math.abs(pos.x - startX);
+  const h = Math.abs(pos.y - startY);
+  drawBox.style.left = x + '%';
+  drawBox.style.top = y + '%';
+  drawBox.style.width = w + '%';
+  drawBox.style.height = h + '%';
+});
+
+photoWrap.addEventListener('mouseup', (e) => {
+  if (!isDrawing) return;
+  isDrawing = false;
+  drawBox.style.display = 'none';
+
+  const pos = getRelativePos(e);
+  const x = Math.round(Math.min(startX, pos.x));
+  const y = Math.round(Math.min(startY, pos.y));
+  const w = Math.round(Math.abs(pos.x - startX));
+  const h = Math.round(Math.abs(pos.y - startY));
+
+  if (w < 2 || h < 2) return; // too small, ignore
+
+  zones[activeMember] = { x, y, w, h };
+  document.getElementById('coords-' + activeMember).textContent = `x:${x}% y:${y}% w:${w}% h:${h}%`;
+
+  // Mark as done
+  document.querySelector(`li[data-name="${activeMember}"]`).classList.add('done');
+
+  renderZones();
+  updateOutput();
+
+  // Auto-advance to next unset member
+  const nextUnset = MEMBERS.find(m => !zones[m.name]);
+  if (nextUnset) selectMember(nextUnset.name);
+  else activeMember = null;
+});
+
+function renderZones() {
+  zonesEl.innerHTML = '';
+  for (const [name, z] of Object.entries(zones)) {
+    const div = document.createElement('div');
+    div.className = 'zone';
+    div.style.left = z.x + '%';
+    div.style.top = z.y + '%';
+    div.style.width = z.w + '%';
+    div.style.height = z.h + '%';
+    div.innerHTML = `<span class="label">${name}</span>`;
+    zonesEl.appendChild(div);
+  }
+}
+
+function updateOutput() {
+  const lines = MEMBERS
+    .filter(m => zones[m.name])
+    .map(m => {
+      const z = zones[m.name];
+      return `  { name: "${m.name}",${' '.repeat(Math.max(1, 10 - m.name.length))}x: ${z.x}, y: ${z.y}, w: ${z.w}, h: ${z.h} },`;
+    });
+
+  if (lines.length === 0) {
+    outputEl.textContent = 'Select members and draw zones...';
+    return;
+  }
+
+  outputEl.textContent = `const PHOTO_MAP = [\n${lines.join('\n')}\n];`;
+}
+
+function copyOutput() {
+  navigator.clipboard.writeText(outputEl.textContent);
+  const btn = document.querySelector('.btn-copy');
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'Copy to Clipboard', 2000);
+}
+
+function resetAll() {
+  zones = {};
+  activeMember = null;
+  document.querySelectorAll('.member-list li').forEach(li => {
+    li.classList.remove('done', 'active');
+    li.querySelector('.coords').textContent = 'Not set';
+  });
+  renderZones();
+  updateOutput();
+}
+
+// Auto-select first member
+selectMember(MEMBERS[0].name);
+</script>
+</body>
+</html>

@@ -27,12 +27,19 @@ export default function FeatureMatrix({ items }: FeatureMatrixProps) {
   };
 
   // Group items by category, sort items within each group
+  // Package items with package_categories are distributed into those categories
   const grouped = useMemo(() => {
     return CATEGORIES
+      .filter((cat) => cat.key !== "package")
       .map((cat) => ({
         key: cat.key,
         label: cat.label,
-        items: [...items.filter((i) => i.category === cat.key && i.is_included)].sort((a, b) => {
+        items: [
+          ...items.filter((i) => i.category === cat.key && i.is_included),
+          ...items.filter(
+            (i) => i.category === "package" && i.is_included && i.package_categories?.includes(cat.key)
+          ),
+        ].sort((a, b) => {
           const dir = sortAsc ? 1 : -1;
           if (sortField === "name") return a.name.localeCompare(b.name) * dir;
           const aVal = itemIncludedInTier(a, sortField) ? 1 : 0;

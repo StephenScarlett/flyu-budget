@@ -14,6 +14,8 @@ import SavingsTab from "../components/savings/SavingsTab";
 import TipsTab from "../components/tips/TipsTab";
 import MembersTab from "../components/members/MembersTab";
 import BebbyChat from "../components/chat/BebbyChat";
+import Landing from "../components/landing/Landing";
+import MemberProfile from "../components/members/MemberProfile";
 import AnimateIn, { staggerDelay } from "../components/ui/AnimateIn";
 import MemberFilter from "../components/ui/MemberFilter";
 import { useTrip } from "../hooks/useTrip";
@@ -29,6 +31,8 @@ export default function BudgetApp() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [showLanding, setShowLanding] = useState(true);
+  const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
   const { trip, loading: tripLoading, updateTrip } = useTrip();
   const { items, loading: itemsLoading, updateItem, addItem, deleteItem } = useBudgetItems(trip?.id);
   const { days, updateDay, addDay, deleteDay, swapDays } = useItinerary(trip?.id);
@@ -92,9 +96,40 @@ export default function BudgetApp() {
     );
   }
 
+  // Landing page
+  if (showLanding) {
+    return (
+      <Landing
+        members={members}
+        onEnter={() => setShowLanding(false)}
+        onMemberClick={(id) => {
+          setProfileMemberId(id);
+          setShowLanding(false);
+        }}
+      />
+    );
+  }
+
+  // Member profile view
+  if (profileMemberId) {
+    const profileMember = members.find((m) => m.id === profileMemberId);
+    if (profileMember) {
+      return (
+        <MemberProfile
+          member={profileMember}
+          members={members}
+          items={items}
+          usdToTtd={usdToTtd}
+          tripStart={trip?.trip_start ?? null}
+          onBack={() => setProfileMemberId(null)}
+        />
+      );
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Header trip={trip} onUpdate={updateTrip} onOpenChat={() => setChatOpen(true)} />
+      <Header trip={trip} onUpdate={updateTrip} onOpenChat={() => setChatOpen(true)} onLogoClick={() => setShowLanding(true)} />
       <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
@@ -169,6 +204,7 @@ export default function BudgetApp() {
             onAdd={addMember}
             onUpdate={handleUpdateMember}
             onDelete={handleDeleteMember}
+            onViewProfile={(id) => setProfileMemberId(id)}
           />
         )}
 

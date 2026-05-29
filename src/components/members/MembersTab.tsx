@@ -13,11 +13,12 @@ interface MembersTabProps {
   onAdd: (member: Omit<Member, "id" | "created_at">) => Promise<string | null>;
   onUpdate: (id: string, updates: Partial<Member>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onViewProfile?: (memberId: string) => void;
 }
 
 type ViewMode = "grid" | "list";
 
-export default function MembersTab({ members, tripId, onAdd, onUpdate, onDelete }: MembersTabProps) {
+export default function MembersTab({ members, tripId, onAdd, onUpdate, onDelete, onViewProfile }: MembersTabProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -91,13 +92,13 @@ export default function MembersTab({ members, tripId, onAdd, onUpdate, onDelete 
           {viewMode === "grid" ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {activeMembers.map((m, i) => (
-                <GridCard key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} />
+                <GridCard key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} onViewProfile={onViewProfile ? () => onViewProfile(m.id) : undefined} />
               ))}
             </div>
           ) : (
             <div className="bg-[#141414] rounded-xl border border-gray-800 divide-y divide-gray-800">
               {activeMembers.map((m, i) => (
-                <ListRow key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} />
+                <ListRow key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} onViewProfile={onViewProfile ? () => onViewProfile(m.id) : undefined} />
               ))}
             </div>
           )}
@@ -113,13 +114,13 @@ export default function MembersTab({ members, tripId, onAdd, onUpdate, onDelete 
           {viewMode === "grid" ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {inactiveMembers.map((m, i) => (
-                <GridCard key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} />
+                <GridCard key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} onViewProfile={onViewProfile ? () => onViewProfile(m.id) : undefined} />
               ))}
             </div>
           ) : (
             <div className="bg-[#141414] rounded-xl border border-gray-800 divide-y divide-gray-800 opacity-60">
               {inactiveMembers.map((m, i) => (
-                <ListRow key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} />
+                <ListRow key={m.id} member={m} index={i} onEdit={() => openEdit(m)} onToggle={() => toggleActive(m)} onDelete={() => setDeleteTarget(m)} onViewProfile={onViewProfile ? () => onViewProfile(m.id) : undefined} />
               ))}
             </div>
           )}
@@ -215,18 +216,18 @@ function MemberAvatar({ member, size = "sm" }: { member: Member; size?: "sm" | "
 }
 
 /* ─── Grid Card ─── */
-function GridCard({ member, index, onEdit, onToggle, onDelete }: {
-  member: Member; index: number; onEdit: () => void; onToggle: () => void; onDelete: () => void;
+function GridCard({ member, index, onEdit, onToggle, onDelete, onViewProfile }: {
+  member: Member; index: number; onEdit: () => void; onToggle: () => void; onDelete: () => void; onViewProfile?: () => void;
 }) {
   return (
     <div
       className={`rounded-xl border p-4 transition-all duration-150 animate-fade-up cursor-pointer ${
         member.is_active
-          ? "bg-[#141414] border-gray-800 hover:border-gray-700"
+          ? "bg-[#141414] border-gray-800 hover:border-sky-700/50 hover:bg-[#161922]"
           : "bg-[#0e0e0e] border-gray-800/50 opacity-50"
       }`}
       style={{ animationDelay: `${index * 40}ms` }}
-      onClick={onEdit}
+      onClick={onViewProfile ?? onEdit}
     >
       <div className="flex flex-col items-center text-center">
         <MemberAvatar member={member} size="md" />
@@ -272,14 +273,14 @@ function GridCard({ member, index, onEdit, onToggle, onDelete }: {
 }
 
 /* ─── List Row ─── */
-function ListRow({ member, index, onEdit, onToggle, onDelete }: {
-  member: Member; index: number; onEdit: () => void; onToggle: () => void; onDelete: () => void;
+function ListRow({ member, index, onEdit, onToggle, onDelete, onViewProfile }: {
+  member: Member; index: number; onEdit: () => void; onToggle: () => void; onDelete: () => void; onViewProfile?: () => void;
 }) {
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a1a1a]/60 transition-colors animate-fade-up cursor-pointer"
       style={{ animationDelay: `${index * 30}ms` }}
-      onClick={onEdit}
+      onClick={onViewProfile ?? onEdit}
     >
       <MemberAvatar member={member} size="sm" />
       <div className="flex-1 min-w-0">
