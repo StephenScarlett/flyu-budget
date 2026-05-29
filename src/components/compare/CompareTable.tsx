@@ -25,6 +25,7 @@ export default function CompareTable({ items, groupSize, usdToTtd, members }: Co
       if (item.cost_type === "per_person") total += item.cost_usd;
       else if (item.cost_type === "total_group") total += item.cost_usd / groupSize;
       else if (item.cost_type === "per_room") total += item.cost_usd / 2;
+      else if (item.cost_type === "split_between") total += item.cost_usd / (item.member_ids?.length || groupSize);
     }
     return total;
   }

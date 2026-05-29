@@ -35,6 +35,7 @@ export const CATEGORIES = [
   { key: "transport", label: "Transport" },
   { key: "food", label: "Food & Dining" },
   { key: "extras", label: "Extras" },
+  { key: "package", label: "Package" },
 ] as const;
 
 export type CategoryKey = (typeof CATEGORIES)[number]["key"];

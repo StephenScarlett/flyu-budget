@@ -44,8 +44,8 @@ const TIER_OPTIONS = [
 
 const COST_TYPE_OPTIONS = [
   { value: "per_person", label: "Per Member" },
+  { value: "split_between", label: "Split Between" },
   { value: "total_group", label: "Group Total" },
-  { value: "per_room", label: "Per Room" },
 ];
 
 type SortField = "category" | "name" | "description" | "cost_usd" | "cost_type" | "tier" | "source_label";
@@ -184,7 +184,7 @@ function ItemModal({
                   setForm({
                     ...form,
                     cost_type: newType,
-                    member_ids: newType === "per_person" ? form.member_ids : null,
+                    member_ids: (newType === "per_person" || newType === "split_between") ? form.member_ids : null,
                   });
                 }}
                 className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 focus:border-sky-600 focus:outline-none"
@@ -208,8 +208,8 @@ function ItemModal({
             </div>
           </div>
 
-          {/* Member Assignment — only for Per Member cost type */}
-          {form.cost_type === "per_person" && activeMembers.length > 0 && (
+          {/* Member Assignment — only for Per Member and Split Between cost types */}
+          {(form.cost_type === "per_person" || form.cost_type === "split_between") && activeMembers.length > 0 && (
             <div>
               <label className="block text-xs text-gray-500 mb-1.5">Applies To</label>
               <div className="flex flex-wrap gap-1.5">
@@ -393,6 +393,7 @@ function SortHeader({
 /* ─── Main CostTable ─── */
 export default function CostTable({ items, members, onUpdate, onDelete, onAdd, tripId }: CostTableProps) {
   const [filter, setFilter] = useState<string>("all");
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [sortField, setSortField] = useState<SortField>("category");
   const [sortAsc, setSortAsc] = useState(true);
   const [page, setPage] = useState(0);
@@ -403,7 +404,8 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
   const [deleteTarget, setDeleteTarget] = useState<BudgetItem | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
-  const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
+  const baseItems = showActiveOnly ? items.filter((i) => i.is_included) : items;
+  const filtered = filter === "all" ? baseItems : baseItems.filter((i) => i.category === filter);
 
   const sorted = [...filtered].sort((a, b) => {
     const dir = sortAsc ? 1 : -1;
@@ -418,7 +420,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
   const paged = sorted.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   // Reset page when filter changes
-  useEffect(() => { setPage(0); }, [filter]);
+  useEffect(() => { setPage(0); }, [filter, showActiveOnly]);
 
   function handleSort(field: SortField) {
     if (sortField === field) setSortAsc(!sortAsc);
@@ -473,10 +475,10 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                 : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
             }`}
           >
-            All ({items.length})
+            All ({baseItems.length})
           </button>
           {CATEGORIES.map((cat) => {
-            const count = items.filter((i) => i.category === cat.key).length;
+            const count = baseItems.filter((i) => i.category === cat.key).length;
             const Icon = CATEGORY_ICONS[cat.key];
             return (
               <button
@@ -495,14 +497,27 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
           })}
         </div>
 
-        {/* Add button */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-3 py-1.5 bg-sky-600 text-white text-xs font-medium rounded-lg hover:bg-sky-500 transition-colors inline-flex items-center gap-1.5 flex-shrink-0"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add
-        </button>
+        {/* Actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setShowActiveOnly(!showActiveOnly)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 ${
+              showActiveOnly
+                ? "bg-emerald-600/20 text-emerald-400 border border-emerald-600/40"
+                : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
+            }`}
+          >
+            <Check className="w-3.5 h-3.5" />
+            Active Only
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3 py-1.5 bg-sky-600 text-white text-xs font-medium rounded-lg hover:bg-sky-500 transition-colors inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add
+          </button>
+        </div>
       </div>
 
       {/* Table Container — scrollable body, sticky header */}
@@ -564,7 +579,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                           <TypeIcon className="w-3.5 h-3.5 text-gray-500" />
                           {costTypeLabel(item.cost_type)}
                         </span>
-                        {item.cost_type === "per_person" && item.member_ids && item.member_ids.length > 0 && (
+                        {(item.cost_type === "per_person" || item.cost_type === "split_between") && item.member_ids && item.member_ids.length > 0 && (
                           <p
                             className="text-[10px] text-sky-400/70 mt-0.5 cursor-default"
                             title={item.member_ids.map((id) => members.find((m) => m.id === id)?.name ?? id).join(", ")}

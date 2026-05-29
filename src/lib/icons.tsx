@@ -6,6 +6,7 @@ import {
   Car,
   UtensilsCrossed,
   ShoppingBag,
+  Package,
   BarChart3,
   Wallet,
   Scale,
@@ -51,6 +52,7 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   transport: Car,
   food: UtensilsCrossed,
   extras: ShoppingBag,
+  package: Package,
 };
 
 /* ─── Tab Icons ─── */
@@ -76,6 +78,7 @@ export const COST_TYPE_ICONS: Record<string, LucideIcon> = {
   per_person: User,
   total_group: Users,
   per_room: BedDouble,
+  split_between: CircleDollarSign,
 };
 
 /* ─── Misc Icons (re-export for convenience) ─── */

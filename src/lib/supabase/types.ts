@@ -32,7 +32,7 @@ export interface BudgetItem {
   name: string;
   description: string | null;
   cost_usd: number;
-  cost_type: "per_person" | "total_group" | "per_room";
+  cost_type: "per_person" | "total_group" | "per_room" | "split_between";
   tier: string;
   source_label: string | null;
   source_url: string | null;

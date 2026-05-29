@@ -31,6 +31,9 @@ export function calculateTierTotal(
       perPerson += item.cost_usd / groupSize;
     } else if (item.cost_type === "per_room") {
       perPerson += item.cost_usd / 2;
+    } else if (item.cost_type === "split_between") {
+      const splitCount = item.member_ids?.length || groupSize;
+      perPerson += item.cost_usd / splitCount;
     }
   }
 
@@ -63,6 +66,9 @@ export function calculateMemberTierTotal(
       total += item.cost_usd / applicableCount;
     } else if (item.cost_type === "per_room") {
       total += item.cost_usd / 2;
+    } else if (item.cost_type === "split_between") {
+      const splitCount = item.member_ids?.length || activeMembers.length;
+      total += item.cost_usd / splitCount;
     }
   }
 
