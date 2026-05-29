@@ -158,6 +158,7 @@ export default function Header({ trip, onUpdate, onOpenChat }: HeaderProps) {
                     Save
                   </button>
                 </div>
+                </div>
               </div>
             )}
           </div>
