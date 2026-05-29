@@ -45,7 +45,7 @@ export default function MemberProfile({
   }, [items, member.id, activeMembers, usdToTtd, tripStart]);
 
   const itemsByCategory = useMemo(() => {
-    const memberItems = items.filter((item) => itemAppliesToMember(item, member.id));
+    const memberItems = items.filter((item) => item.is_included && itemAppliesToMember(item, member.id));
     const grouped: Record<string, BudgetItem[]> = {};
     for (const item of memberItems) {
       if (item.category === "package" && item.package_categories && item.package_categories.length > 0) {
@@ -69,6 +69,28 @@ export default function MemberProfile({
   );
 
   const balanced = tierTotals.find((t) => t.tier === "balanced")!;
+
+  // Calculate what this member actually pays for an item
+  function memberCostForItem(item: BudgetItem): number {
+    if (item.cost_type === "per_person") return item.cost_usd;
+    if (item.cost_type === "total_group") {
+      const applicable = item.member_ids?.length || activeMembers.length;
+      return Math.round((item.cost_usd / applicable) * 100) / 100;
+    }
+    if (item.cost_type === "per_room") return Math.round((item.cost_usd / 2) * 100) / 100;
+    if (item.cost_type === "split_between") {
+      const splitCount = item.member_ids?.length || activeMembers.length;
+      return Math.round((item.cost_usd / splitCount) * 100) / 100;
+    }
+    return item.cost_usd;
+  }
+
+  const COST_TYPE_LABELS: Record<string, string> = {
+    per_person: "Per person",
+    total_group: "Split across group",
+    per_room: "Per room (÷2)",
+    split_between: "Split between selected",
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
@@ -194,19 +216,19 @@ export default function MemberProfile({
           })}
         </div>
 
-        {/* Category breakdown - horizontal cards instead of stacked list */}
+        {/* Category breakdown */}
         <div className="animate-fade-up" style={{ animationDelay: "200ms" }}>
           <h2 className="text-lg font-bold text-white mb-4">What You&apos;re Paying For</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {CATEGORIES.map((cat) => {
+          <div className="space-y-5">
+            {CATEGORIES.filter((cat) => cat.key !== "package").map((cat) => {
               const catItems = itemsByCategory[cat.key];
               if (!catItems || catItems.length === 0) return null;
               const CatIcon = CATEGORY_ICONS[cat.key as CategoryKey];
-              const catTotal = catItems.reduce((sum, item) => sum + item.cost_usd, 0);
+              const catYouPay = catItems.reduce((sum, item) => sum + memberCostForItem(item), 0);
               return (
-                <div key={cat.key} className="rounded-xl border border-gray-800 bg-[#141414] p-4 hover:border-gray-700 transition-colors">
+                <div key={cat.key} className="rounded-xl border border-gray-800 bg-[#141414] overflow-hidden">
                   {/* Category header */}
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between px-4 py-3 bg-[#1a1a1a]">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center">
                         {CatIcon && <CatIcon className="w-4 h-4 text-sky-400" />}
@@ -216,28 +238,54 @@ export default function MemberProfile({
                         <p className="text-xs text-gray-500">{catItems.length} item{catItems.length !== 1 ? "s" : ""}</p>
                       </div>
                     </div>
-                    <p className="text-lg font-bold text-sky-300">{formatUSD(catTotal)}</p>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-sky-300">{formatUSD(catYouPay)}</p>
+                      <p className="text-[10px] text-gray-500">you pay</p>
+                    </div>
                   </div>
                   {/* Items */}
-                  <div className="space-y-2">
-                    {catItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-white/[0.02]">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm text-gray-300 truncate">{item.description}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {item.tier !== "all" && (
+                  <div className="divide-y divide-gray-800/60">
+                    {catItems.map((item) => {
+                      const youPay = memberCostForItem(item);
+                      const isShared = item.cost_type !== "per_person";
+                      return (
+                        <div key={`${cat.key}-${item.id}`} className="px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-200">{item.name}</p>
+                              {item.description && (
+                                <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
+                              )}
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-sm font-semibold text-white">{formatUSD(youPay)}</p>
+                              {isShared && (
+                                <p className="text-[10px] text-gray-600">{formatUSD(item.cost_usd)} total</p>
+                              )}
+                            </div>
+                          </div>
+                          {/* Meta row */}
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {item.tier !== "all" ? (
                               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${TIER_CONFIG[item.tier as TierKey]?.bg ?? ""} ${TIER_CONFIG[item.tier as TierKey]?.color ?? "text-gray-500"}`}>
                                 {TIER_CONFIG[item.tier as TierKey]?.label ?? item.tier}
                               </span>
+                            ) : (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">All tiers</span>
                             )}
-                            <span className="text-[10px] text-gray-600">
-                              {item.cost_type === "per_person" ? "pp" : item.cost_type === "total_group" ? "group" : item.cost_type === "per_room" ? "room" : "split"}
-                            </span>
+                            <span className="text-[10px] text-gray-600">{COST_TYPE_LABELS[item.cost_type]}</span>
+                            {item.is_optional && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-400">Optional</span>
+                            )}
+                            {item.source_url && (
+                              <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-sky-500 hover:text-sky-400 underline underline-offset-2">
+                                {item.source_label || "Source"}
+                              </a>
+                            )}
                           </div>
                         </div>
-                        <p className="text-sm font-mono text-gray-400 ml-3">{formatUSD(item.cost_usd)}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
