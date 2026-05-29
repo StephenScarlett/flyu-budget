@@ -64,6 +64,7 @@ const EMPTY_ITEM = {
   is_optional: false,
   is_included: true,
   member_ids: null as string[] | null,
+  package_categories: null as string[] | null,
 };
 
 /* ─── Modal ─── */
@@ -131,7 +132,14 @@ function ItemModal({
               <label className="block text-xs text-gray-500 mb-1.5">Category *</label>
               <select
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                onChange={(e) => {
+                  const newCat = e.target.value;
+                  setForm({
+                    ...form,
+                    category: newCat,
+                    package_categories: newCat === "package" ? form.package_categories : null,
+                  });
+                }}
                 className="w-full px-3 py-2 bg-[#222] border border-gray-700 rounded-lg text-sm text-gray-200 focus:border-sky-600 focus:outline-none"
               >
                 {CATEGORIES.map((c) => (
@@ -150,6 +158,40 @@ function ItemModal({
               />
             </div>
           </div>
+
+          {/* Package Categories — only for Package category */}
+          {form.category === "package" && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5">Included Categories</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CATEGORIES.filter((c) => c.key !== "package").map((cat) => {
+                  const selected = form.package_categories?.includes(cat.key) ?? false;
+                  const Icon = CATEGORY_ICONS[cat.key];
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => {
+                        const current = form.package_categories ?? [];
+                        const updated = selected
+                          ? current.filter((k) => k !== cat.key)
+                          : [...current, cat.key];
+                        setForm({ ...form, package_categories: updated.length === 0 ? null : updated });
+                      }}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1 ${
+                        selected
+                          ? "bg-sky-600 text-white"
+                          : "bg-[#222] text-gray-400 hover:bg-[#2a2a2a] hover:text-gray-200"
+                      }`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {cat.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Description */}
           <div>
@@ -405,7 +447,13 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const baseItems = showActiveOnly ? items.filter((i) => i.is_included) : items;
-  const filtered = filter === "all" ? baseItems : baseItems.filter((i) => i.category === filter);
+  const filtered = filter === "all"
+    ? baseItems
+    : baseItems.filter(
+        (i) =>
+          i.category === filter ||
+          (i.category === "package" && i.package_categories?.includes(filter))
+      );
 
   const sorted = [...filtered].sort((a, b) => {
     const dir = sortAsc ? 1 : -1;
@@ -436,6 +484,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
       is_optional: data.is_optional,
       is_included: data.is_included,
       member_ids: data.member_ids,
+      package_categories: data.package_categories,
     });
     setShowAddModal(false);
   }, [onAdd, tripId, items.length]);
@@ -453,6 +502,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
       source_url: data.source_url || null,
       is_optional: data.is_optional,
       member_ids: data.member_ids,
+      package_categories: data.package_categories,
     });
     setEditItem(null);
   }, [editItem, onUpdate]);
@@ -552,10 +602,22 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                     <Fragment key={item.id}>
                     <tr className={`group animate-fade-up transition-opacity duration-150 ${item.is_included ? 'hover:bg-[#1a1a1a]/60' : 'opacity-40 hover:bg-[#1a1a1a]/30'}`} style={{ animationDelay: `${120 + idx * 30}ms` }}>
                       <td className="px-3 py-2.5">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+                        <span
+                          className="inline-flex items-center gap-1.5 text-xs text-gray-400 cursor-default"
+                          title={
+                            item.category === "package" && item.package_categories?.length
+                              ? `Includes: ${item.package_categories.map((k) => CATEGORY_MAP[k as keyof typeof CATEGORY_MAP]?.label ?? k).join(", ")}`
+                              : undefined
+                          }
+                        >
                           {CatIcon && <CatIcon className="w-3.5 h-3.5 text-sky-400" />}
                           {CATEGORY_MAP[item.category as keyof typeof CATEGORY_MAP]?.label ?? item.category}
                         </span>
+                        {item.category === "package" && item.package_categories && item.package_categories.length > 0 && (
+                          <p className="text-[10px] text-sky-400/70 mt-0.5">
+                            {item.package_categories.length} {item.package_categories.length === 1 ? "category" : "categories"}
+                          </p>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 font-medium text-gray-100 min-w-[180px]">
                         {item.name}

@@ -40,6 +40,7 @@ export interface BudgetItem {
   is_optional: boolean;
   is_included: boolean;
   member_ids: string[] | null;
+  package_categories: string[] | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
