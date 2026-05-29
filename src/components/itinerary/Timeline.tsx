@@ -190,16 +190,16 @@ function DayCard({
               ) : (
                 <>
                   {onMoveUp && (
-                    <button onClick={onMoveUp} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 opacity-0 group-hover:opacity-100 transition-all" title="Move up">
+                    <button onClick={onMoveUp} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all" title="Move up">
                       <ChevronUp className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {onMoveDown && (
-                    <button onClick={onMoveDown} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 opacity-0 group-hover:opacity-100 transition-all" title="Move down">
+                    <button onClick={onMoveDown} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all" title="Move down">
                       <ChevronDown className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <button onClick={() => setEditing(true)} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 opacity-0 group-hover:opacity-100 transition-all" title="Edit">
+                  <button onClick={() => setEditing(true)} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all" title="Edit">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   {confirmDelete ? (
@@ -208,7 +208,7 @@ function DayCard({
                       <button onClick={() => setConfirmDelete(false)} className="px-2 py-1 text-xs bg-[#222] text-gray-400 rounded hover:bg-[#333]">No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all" title="Delete">
+                    <button onClick={() => setConfirmDelete(true)} className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all" title="Delete">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}

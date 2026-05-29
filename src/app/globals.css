@@ -79,3 +79,12 @@ summary {
 
 /* Stagger delay utility: apply via style={{ animationDelay: 'Xms' }} */
 .animate-stagger { animation-fill-mode: both; }
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

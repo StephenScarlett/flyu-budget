@@ -104,13 +104,13 @@ export default function Header({ trip, onUpdate, onOpenChat }: HeaderProps) {
           </div>
 
           {/* Trip details — editable */}
-          <div className="hidden sm:block text-right relative" ref={popoverRef}>
+          <div className="text-right relative flex-shrink-0" ref={popoverRef}>
             <button onClick={openEdit} className="group text-right cursor-pointer" title="Click to edit trip details">
-              <p className="text-xs text-gray-500 inline-flex items-center gap-1">
+              <p className="text-xs text-gray-500 hidden sm:inline-flex items-center gap-1">
                 Trip Dates
                 <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
               </p>
-              <p className="text-sm font-medium text-sky-300">
+              <p className="text-xs sm:text-sm font-medium text-sky-300">
                 {trip?.trip_start || trip?.trip_end ? (
                   <>
                     {formatDate(trip?.trip_start ?? null)} – {formatDateFull(trip?.trip_end ?? null)}
@@ -123,7 +123,8 @@ export default function Header({ trip, onUpdate, onOpenChat }: HeaderProps) {
 
             {/* Edit popover */}
             {editing && (
-              <div className="absolute right-0 top-full mt-2 z-50 bg-[#181818] border border-gray-700 rounded-xl shadow-2xl p-4 min-w-[280px] animate-fade-down" style={{ animationDuration: '200ms' }}>
+              <div className="fixed inset-0 z-50 bg-black/40 sm:bg-transparent sm:static sm:inset-auto flex items-center justify-center sm:block">
+                <div className="bg-[#181818] border border-gray-700 rounded-xl shadow-2xl p-4 w-[90vw] max-w-[320px] sm:w-auto sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:min-w-[280px] animate-fade-down" style={{ animationDuration: '200ms' }}>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <label className="text-xs text-gray-500 w-12 text-left">Start</label>
@@ -157,6 +158,7 @@ export default function Header({ trip, onUpdate, onOpenChat }: HeaderProps) {
                     Save
                   </button>
                 </div>
+              </div>
               </div>
             )}
           </div>

@@ -22,6 +22,7 @@ import {
   User,
   Users,
   BedDouble,
+  SlidersHorizontal,
 } from "../../lib/icons";
 
 interface CostTableProps {
@@ -127,7 +128,7 @@ function ItemModal({
         {/* Body */}
         <div className="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
           {/* Category + Name */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1.5">Category *</label>
               <select
@@ -205,7 +206,7 @@ function ItemModal({
           </div>
 
           {/* Cost + Type + Tier */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1.5">Cost (USD) *</label>
               <input
@@ -299,7 +300,7 @@ function ItemModal({
           )}
 
           {/* Source Label + URL */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1.5">Source Label</label>
               <input
@@ -406,6 +407,7 @@ function SortHeader({
   asc,
   onSort,
   className = "",
+  hideClass = "",
 }: {
   label: string;
   field: SortField;
@@ -413,11 +415,12 @@ function SortHeader({
   asc: boolean;
   onSort: (f: SortField) => void;
   className?: string;
+  hideClass?: string;
 }) {
   const active = currentField === field;
   return (
     <th
-      className={`px-3 py-3 font-medium text-gray-400 cursor-pointer hover:text-gray-200 whitespace-nowrap select-none ${className}`}
+      className={`px-3 py-3 font-medium text-gray-400 cursor-pointer hover:text-gray-200 whitespace-nowrap select-none ${className} ${hideClass}`}
       onClick={() => onSort(field)}
     >
       <span className="inline-flex items-center gap-1">
@@ -436,6 +439,7 @@ function SortHeader({
 export default function CostTable({ items, members, onUpdate, onDelete, onAdd, tripId }: CostTableProps) {
   const [filter, setFilter] = useState<string>("all");
   const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [sortField, setSortField] = useState<SortField>("category");
   const [sortAsc, setSortAsc] = useState(true);
   const [page, setPage] = useState(0);
@@ -514,12 +518,56 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
   return (
     <div className="flex flex-col h-[calc(100vh-220px)] min-h-[400px]">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 flex-shrink-0 animate-fade-up">
-        {/* Filters */}
-        <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 flex-shrink-0 animate-fade-up">
+        {/* Filter toggle + active filter indicator */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+              filter !== "all"
+                ? "bg-sky-600/20 text-sky-400 border border-sky-600/40"
+                : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Filters</span>
+            {filter !== "all" && (
+              <span className="bg-sky-600 text-white text-[10px] px-1.5 py-0.5 rounded-full leading-none">
+                {CATEGORIES.find((c) => c.key === filter)?.label ?? filter}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setShowActiveOnly(!showActiveOnly)}
+            className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 ${
+              showActiveOnly
+                ? "bg-emerald-600/20 text-emerald-400 border border-emerald-600/40"
+                : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
+            }`}
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Active Only</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-3 py-2 bg-sky-600 text-white text-xs font-medium rounded-lg hover:bg-sky-500 transition-colors inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Collapsible filter pills */}
+      {showFilters && (
+        <div className="flex flex-wrap gap-1.5 mb-3 animate-fade-up" style={{ animationDuration: '150ms' }}>
           <button
             onClick={() => setFilter("all")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            className={`px-3 py-2 rounded-full text-xs font-medium transition-colors ${
               filter === "all"
                 ? "bg-sky-600 text-white"
                 : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
@@ -538,7 +586,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
               <button
                 key={cat.key}
                 onClick={() => setFilter(cat.key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
+                className={`px-3 py-2 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5 ${
                   filter === cat.key
                     ? "bg-sky-600 text-white"
                     : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
@@ -550,29 +598,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
             );
           })}
         </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => setShowActiveOnly(!showActiveOnly)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 ${
-              showActiveOnly
-                ? "bg-emerald-600/20 text-emerald-400 border border-emerald-600/40"
-                : "bg-[#1a1a1a] text-gray-400 hover:bg-[#222] hover:text-gray-200"
-            }`}
-          >
-            <Check className="w-3.5 h-3.5" />
-            Active Only
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 bg-sky-600 text-white text-xs font-medium rounded-lg hover:bg-sky-500 transition-colors inline-flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Table Container — scrollable body, sticky header */}
       <div className="bg-[#141414] rounded-xl border border-gray-800 flex flex-col flex-1 min-h-0 overflow-hidden animate-fade-up" style={{ animationDelay: '80ms' }}>
@@ -582,12 +608,12 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
               <tr className="bg-[#1a1a1a]">
                 <SortHeader label="Category" field="category" currentField={sortField} asc={sortAsc} onSort={handleSort} />
                 <SortHeader label="Item" field="name" currentField={sortField} asc={sortAsc} onSort={handleSort} />
-                <SortHeader label="Description" field="description" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <SortHeader label="Description" field="description" currentField={sortField} asc={sortAsc} onSort={handleSort} hideClass="hidden md:table-cell" />
                 <SortHeader label="Cost (USD)" field="cost_usd" currentField={sortField} asc={sortAsc} onSort={handleSort} className="text-right" />
-                <SortHeader label="Type" field="cost_type" currentField={sortField} asc={sortAsc} onSort={handleSort} />
+                <SortHeader label="Type" field="cost_type" currentField={sortField} asc={sortAsc} onSort={handleSort} hideClass="hidden lg:table-cell" />
                 <SortHeader label="Tier" field="tier" currentField={sortField} asc={sortAsc} onSort={handleSort} />
-                <SortHeader label="Source" field="source_label" currentField={sortField} asc={sortAsc} onSort={handleSort} />
-                <th className="px-3 py-3 font-medium text-gray-400 w-24 text-center whitespace-nowrap">Actions</th>
+                <SortHeader label="Source" field="source_label" currentField={sortField} asc={sortAsc} onSort={handleSort} hideClass="hidden lg:table-cell" />
+                <th className="px-3 py-3 font-medium text-gray-400 w-20 sm:w-24 text-center whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
@@ -623,11 +649,11 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                           </p>
                         )}
                       </td>
-                      <td className="px-3 py-2.5 font-medium text-gray-100 min-w-[180px]">
+                      <td className="px-3 py-2.5 font-medium text-gray-100 min-w-[100px] sm:min-w-[180px]">
                         {item.name}
                       </td>
                       <td
-                        className="px-3 py-2.5 text-gray-500 text-xs max-w-[220px] cursor-pointer"
+                        className="px-3 py-2.5 text-gray-500 text-xs max-w-[220px] cursor-pointer hidden md:table-cell"
                         title={item.description || undefined}
                         onClick={() => setExpandedRow(isExpanded ? null : item.id)}
                       >
@@ -640,7 +666,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                       <td className="px-3 py-2.5 text-right font-mono text-sm text-gray-200">
                         {formatUSD(item.cost_usd)}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 hidden lg:table-cell">
                         <span className="inline-flex items-center gap-1 text-xs text-gray-400">
                           <TypeIcon className="w-3.5 h-3.5 text-gray-500" />
                           {costTypeLabel(item.cost_type)}
@@ -671,7 +697,7 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                           {tierLabel(item.tier)}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-xs">
+                      <td className="px-3 py-2.5 text-xs hidden lg:table-cell">
                         {item.source_url ? (
                           <a
                             href={item.source_url}
@@ -703,17 +729,17 @@ export default function CostTable({ items, members, onUpdate, onDelete, onAdd, t
                           </button>
                           <button
                             onClick={() => setEditItem(item)}
-                            className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 transition-colors"
+                            className="p-2 sm:p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-sky-400 transition-colors"
                             title="Edit"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteTarget(item)}
-                            className="p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-red-400 transition-colors"
+                            className="p-2 sm:p-1.5 rounded hover:bg-[#222] text-gray-500 hover:text-red-400 transition-colors"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                           </button>
                         </div>
                       </td>

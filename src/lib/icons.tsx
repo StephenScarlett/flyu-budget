@@ -40,6 +40,7 @@ import {
   Mail,
   Phone,
   StickyNote,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 
@@ -107,6 +108,7 @@ export {
   Mail,
   Phone,
   StickyNote,
+  SlidersHorizontal,
 };
 
 export type { LucideIcon };

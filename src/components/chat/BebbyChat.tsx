@@ -316,7 +316,7 @@ export default function BebbyChat({
                     ) : (
                       <button
                         onClick={() => setConfirmDeleteId(chat.id)}
-                        className="p-1 rounded hover:bg-[#222] text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                        className="p-1 rounded hover:bg-[#222] text-gray-700 hover:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0"
                         title="Delete chat"
                       >
                         <Trash2 className="w-3 h-3" />
