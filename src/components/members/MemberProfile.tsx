@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TIER_CONFIG, CATEGORIES, type TierKey, type CategoryKey } from "../../lib/constants";
 import {
   calculateMemberTierTotal,
@@ -69,6 +69,9 @@ export default function MemberProfile({
   );
 
   const balanced = tierTotals.find((t) => t.tier === "balanced")!;
+  const [selectedTier, setSelectedTier] = useState<TierKey>("balanced");
+  const activeTier = tierTotals.find((t) => t.tier === selectedTier)!;
+  const activeTierConfig = TIER_CONFIG[selectedTier];
 
   // Calculate what this member actually pays for an item
   function memberCostForItem(item: BudgetItem): number {
@@ -169,62 +172,74 @@ export default function MemberProfile({
               )}
             </div>
 
-            {/* Big balanced total */}
+            {/* Big total for selected tier */}
             <div className="text-right sm:text-right mt-2 sm:mt-0">
-              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Trip Total</p>
+              <p className={`text-xs uppercase tracking-wider mb-1 ${activeTierConfig.color}`}>{activeTierConfig.label} Tier</p>
               <p className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-sky-100">
-                {formatUSD(balanced.total)}
+                {formatUSD(activeTier.total)}
               </p>
-              <p className="text-sm text-gray-500 mt-0.5">{formatTTD(balanced.ttd)}</p>
+              <p className="text-sm text-gray-500 mt-0.5">{formatTTD(activeTier.ttd)}</p>
             </div>
           </div>
         </div>
 
-        {/* Dashboard grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Tier cards */}
+        {/* Tier selector cards */}
+        <div className="grid grid-cols-3 gap-3 sm:gap-6 mb-8">
           {tierTotals.map(({ tier, total, ttd, monthly, monthlyTtd }, i) => {
             const config = TIER_CONFIG[tier];
             const Icon = TIER_ICONS[tier];
+            const isSelected = selectedTier === tier;
             return (
-              <div
+              <button
                 key={tier}
-                className={`rounded-2xl border ${config.border} bg-gradient-to-b from-[#141414] to-[#0a0a0a] p-5 animate-fade-up`}
+                onClick={() => setSelectedTier(tier)}
+                className={`rounded-2xl border text-left bg-gradient-to-b from-[#141414] to-[#0a0a0a] p-4 sm:p-5 animate-fade-up transition-all cursor-pointer ${
+                  isSelected
+                    ? `${config.border} ring-1 ${tier === "budget" ? "ring-emerald-500/40" : tier === "balanced" ? "ring-sky-500/40" : "ring-amber-500/40"}`
+                    : "border-gray-800 opacity-60 hover:opacity-80"
+                }`}
                 style={{ animationDelay: `${i * 80}ms` }}
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg ${config.bg} flex items-center justify-center`}>
-                      <Icon className={`w-4 h-4 ${config.iconColor}`} />
-                    </div>
-                    <h3 className={`text-sm font-bold ${config.color}`}>{config.label}</h3>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${config.bg} flex items-center justify-center`}>
+                    <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${config.iconColor}`} />
                   </div>
+                  <h3 className={`text-xs sm:text-sm font-bold ${config.color}`}>{config.label}</h3>
                 </div>
-                <p className="text-2xl font-bold text-white mb-0.5">{formatUSD(total)}</p>
-                <p className="text-sm text-gray-500">{formatTTD(ttd)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white mb-0.5">{formatUSD(total)}</p>
+                <p className="text-xs sm:text-sm text-gray-500">{formatTTD(ttd)}</p>
                 {monthly > 0 && (
-                  <div className="mt-4 pt-4 border-t border-gray-800/60">
+                  <div className="mt-3 pt-3 border-t border-gray-800/60">
                     <div className="flex items-baseline justify-between">
-                      <p className="text-xs text-gray-500">Save per month</p>
-                      <p className={`text-base font-bold ${config.color}`}>{formatUSD(monthly)}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-500">Monthly</p>
+                      <p className={`text-sm font-bold ${config.color}`}>{formatUSD(monthly)}</p>
                     </div>
-                    <p className="text-xs text-gray-600 text-right">{formatTTD(monthlyTtd)}</p>
+                    <p className="text-[10px] text-gray-600 text-right">{formatTTD(monthlyTtd)}</p>
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
 
-        {/* Category breakdown */}
+        {/* Category breakdown — filtered to selected tier */}
         <div className="animate-fade-up" style={{ animationDelay: "200ms" }}>
-          <h2 className="text-lg font-bold text-white mb-4">What You&apos;re Paying For</h2>
+          <h2 className="text-lg font-bold text-white mb-4">
+            What You&apos;re Paying For
+            <span className={`text-sm font-normal ml-2 ${activeTierConfig.color}`}>({activeTierConfig.label})</span>
+          </h2>
           <div className="space-y-5">
             {CATEGORIES.filter((cat) => cat.key !== "package").map((cat) => {
-              const catItems = itemsByCategory[cat.key];
-              if (!catItems || catItems.length === 0) return null;
+              const allCatItems = itemsByCategory[cat.key];
+              if (!allCatItems || allCatItems.length === 0) return null;
+              // Filter to items that apply to the selected tier
+              const catItems = allCatItems.filter(
+                (item) => item.tier === "all" || item.tier === selectedTier || item.tier.includes(selectedTier)
+              );
+              if (catItems.length === 0) return null;
               const CatIcon = CATEGORY_ICONS[cat.key as CategoryKey];
               const catYouPay = catItems.reduce((sum, item) => sum + memberCostForItem(item), 0);
+              const catYouPayTtd = convertToTTD(catYouPay, usdToTtd);
               return (
                 <div key={cat.key} className="rounded-xl border border-gray-800 bg-[#141414] overflow-hidden">
                   {/* Category header */}
@@ -240,13 +255,14 @@ export default function MemberProfile({
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-sky-300">{formatUSD(catYouPay)}</p>
-                      <p className="text-[10px] text-gray-500">you pay</p>
+                      <p className="text-[10px] text-gray-500">{formatTTD(catYouPayTtd)}</p>
                     </div>
                   </div>
                   {/* Items */}
                   <div className="divide-y divide-gray-800/60">
                     {catItems.map((item) => {
                       const youPay = memberCostForItem(item);
+                      const youPayTtd = convertToTTD(youPay, usdToTtd);
                       const isShared = item.cost_type !== "per_person";
                       return (
                         <div key={`${cat.key}-${item.id}`} className="px-4 py-3">
@@ -259,6 +275,7 @@ export default function MemberProfile({
                             </div>
                             <div className="text-right flex-shrink-0">
                               <p className="text-sm font-semibold text-white">{formatUSD(youPay)}</p>
+                              <p className="text-[10px] text-gray-500">{formatTTD(youPayTtd)}</p>
                               {isShared && (
                                 <p className="text-[10px] text-gray-600">{formatUSD(item.cost_usd)} total</p>
                               )}
@@ -266,13 +283,6 @@ export default function MemberProfile({
                           </div>
                           {/* Meta row */}
                           <div className="flex flex-wrap items-center gap-2 mt-2">
-                            {item.tier !== "all" ? (
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${TIER_CONFIG[item.tier as TierKey]?.bg ?? ""} ${TIER_CONFIG[item.tier as TierKey]?.color ?? "text-gray-500"}`}>
-                                {TIER_CONFIG[item.tier as TierKey]?.label ?? item.tier}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">All tiers</span>
-                            )}
                             <span className="text-[10px] text-gray-600">{COST_TYPE_LABELS[item.cost_type]}</span>
                             {item.is_optional && (
                               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-400">Optional</span>
