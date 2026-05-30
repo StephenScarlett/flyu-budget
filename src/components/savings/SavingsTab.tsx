@@ -75,7 +75,7 @@ export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, memb
       <MemberFilter members={members} selected={selectedMembers} onChange={onMemberChange} />
       {/* Per-Member Savings */}
       {sorted.length > 0 && (
-        <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">
+        <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden animate-fade-up">
           <div className="px-6 py-4 border-b border-gray-800">
             <h3 className="font-semibold text-white inline-flex items-center gap-2">
               <PartyPopper className="w-5 h-5 text-sky-400" />
@@ -97,8 +97,8 @@ export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, memb
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {sorted.map(({ member, totalUsd, totalTtd, monthlyUsd, monthlyTtd }) => (
-                  <tr key={member.id} className="hover:bg-[#1a1a1a]">
+                {sorted.map(({ member, totalUsd, totalTtd, monthlyUsd, monthlyTtd }, i) => (
+                  <tr key={member.id} className="hover:bg-[#1a1a1a] animate-fade-up" style={{ animationDelay: `${staggerDelay(i, 60) + 100}ms` }}>
                     <td className="px-6 py-3 font-medium text-gray-200">{member.name}</td>
                     <td className="px-6 py-3 text-right font-mono text-gray-200">{formatUSD(totalUsd)}</td>
                     <td className="px-6 py-3 text-right font-mono text-gray-500">{formatTTD(totalTtd)}</td>
@@ -113,7 +113,7 @@ export default function SavingsTab({ items, groupSize, usdToTtd, tripStart, memb
       )}
 
       {/* Milestones */}
-      <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden">
+      <div className="bg-[#141414] rounded-xl border border-gray-800 overflow-hidden animate-fade-up" style={{ animationDelay: "150ms" }}>
         <div className="px-6 py-4 border-b border-gray-800">
           <h3 className="font-semibold text-white inline-flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-sky-400" />

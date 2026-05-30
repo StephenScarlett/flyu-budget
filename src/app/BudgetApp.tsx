@@ -105,6 +105,7 @@ export default function BudgetApp() {
         onMemberClick={(id) => {
           setProfileMemberId(id);
           setShowLanding(false);
+          window.scrollTo(0, 0);
         }}
       />
     );
@@ -204,7 +205,7 @@ export default function BudgetApp() {
             onAdd={addMember}
             onUpdate={handleUpdateMember}
             onDelete={handleDeleteMember}
-            onViewProfile={(id) => setProfileMemberId(id)}
+            onViewProfile={(id) => { setProfileMemberId(id); window.scrollTo(0, 0); }}
           />
         )}
 
